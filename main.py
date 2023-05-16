@@ -3,6 +3,7 @@ from pathlib import Path
 import shutil
 from fastapi import FastAPI, UploadFile, File
 
+from vectordb.vectordb import create_vector_index, get_file_summary
 from conversation.conv import get_agent_response
 
 app = FastAPI()
@@ -83,7 +84,14 @@ async def get_indexes():
 # FILES
 @app.post("/docs/uploadfile/")
 async def create_upload_file(file: UploadFile = File(...)):
-    file_location = f"data/{file.filename}"
-    with open(Path(file_location), "wb+") as file_object:
-        shutil.copyfileobj(file.file, file_object)
-    return {"info": f"file '{file.filename}' saved at location : '{file_location}'"}
+
+    res = create_vector_index(file)
+    res2 = None
+    if res['data']['save_directory'] is not None:
+        res2 = get_file_summary(res['data']['save_directory'])
+
+    return {
+        "result": res,
+        "summary": res2,
+        "code" : 200,
+    }
