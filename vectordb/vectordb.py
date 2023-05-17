@@ -3,22 +3,19 @@ import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
-from langchain.chains import RetrievalQAWithSourcesChain
-from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredEPubLoader, UnstructuredWordDocumentLoader, \
     UnstructuredFileLoader
 
+from cocroach_utils.database_utils import save_error
 
 load_dotenv()
 openai_api = os.environ.get("OPENAI_API_KEY")
 
-
 chunk_size = 1000
 chunk_overlap = 100
-
 persist_directory = './db'
 data_directory = './data'
 
@@ -35,45 +32,21 @@ def get_loader(filename):
     :param filename:
     :return:
     """
-    if filename.endswith('.txt'):
-        return TextLoader(filename)
-    elif filename.endswith('.pdf'):
-        return PyPDFLoader(filename)
-    elif filename.endswith('.epub'):
-        return UnstructuredEPubLoader(filename)
-    elif filename.endswith('.docx') or filename.endswith('.doc'):
-        return UnstructuredWordDocumentLoader(filename)
-    else:
+
+    try:
+        if filename.endswith('.txt'):
+            return TextLoader(filename)
+        elif filename.endswith('.pdf'):
+            return PyPDFLoader(filename)
+        elif filename.endswith('.epub'):
+            return UnstructuredEPubLoader(filename)
+        elif filename.endswith('.docx') or filename.endswith('.doc'):
+            return UnstructuredWordDocumentLoader(filename)
+        else:
+            return None
+    except Exception as e:
+        save_error(e)
         return None
-
-
-def get_file_summary(persist_dir):
-    """
-    Get the summary of the file
-    :return:
-    """
-    embeddings = OpenAIEmbeddings()
-    docsearch = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
-
-    chain = RetrievalQAWithSourcesChain.from_chain_type(ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo"), chain_type="stuff",
-                                                        retriever=docsearch.as_retriever())
-
-    prompt_template = "Give me an extensive summary of the document. Try to include details from the document as a a main ideas and concepts. \n"
-    result = chain({"question": prompt_template}, return_only_outputs=True)
-    print("Answer: " + result["answer"].replace('\n', ' '))
-    print("Source: " + result["sources"])
-
-    # save this to a file
-    with open(os.path.join(persist_dir,"summary.txt"), "w") as f:
-        f.write(result["answer"])
-
-    return {
-        "status": "success",
-        "message": "File summary",
-        "data": {
-            "summary": result["answer"]
-        }
-    }
 
 
 def create_vector_index(file):
@@ -82,6 +55,13 @@ def create_vector_index(file):
     :param file:
     :return:
     """
+
+    if file.filename == '':
+        return {
+            "status": "error",
+            "message": "No file selected"
+        }
+
     filename = f"./data/{file.filename}"
     save_directory = os.path.join(persist_directory, filename.split("/")[-1].split(".")[0])
     with open(Path(filename), "wb+") as file_object:
@@ -100,10 +80,17 @@ def create_vector_index(file):
         text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         docs = text_splitter.split_documents(documents)
 
-        embedding = OpenAIEmbeddings()
-
-        vectordb = Chroma.from_documents(documents=docs, embedding=embedding, persist_directory=save_directory)
-        vectordb.persist()
+        try:
+            embedding = OpenAIEmbeddings()
+            vectordb = Chroma.from_documents(documents=docs, embedding=embedding, persist_directory=save_directory)
+            vectordb.persist()
+        except Exception as e:
+            save_error(e)
+            return {
+                "status": "error",
+                "message": "Error creating index",
+                "error": str(e)
+            }
 
         return {
             "status": "success",
@@ -116,7 +103,7 @@ def create_vector_index(file):
 
     else:
         return {
-            "status": "error",
+            "status": "success",
             "message": "Index already exists",
             "data": {
                 "filename": filename,

@@ -3,7 +3,9 @@ from pathlib import Path
 import shutil
 from fastapi import FastAPI, UploadFile, File
 
-from vectordb.vectordb import create_vector_index, get_file_summary
+from cocroach_utils.database_utils import add_doc
+from conversation.requests_conv import get_file_summary
+from vectordb.vectordb import create_vector_index
 from conversation.conv import get_agent_response
 
 app = FastAPI()
@@ -13,6 +15,7 @@ debug = True
 class ConvRequest(BaseModel):
     user_message: str
     conversation_id: int = 0
+    document: str = None
 
 
 class UserId(BaseModel):
@@ -28,7 +31,7 @@ def read_root():
 @app.post("/conv/get_response")
 async def get_response(body: ConvRequest):
 
-    resp = get_agent_response(body.user_message, body.conversation_id, debug)
+    resp = get_agent_response(body.user_message, body.conversation_id, body.document, debug)
 
     return {
         "response": resp,
@@ -86,12 +89,19 @@ async def get_indexes():
 async def create_upload_file(file: UploadFile = File(...)):
 
     res = create_vector_index(file)
-    res2 = None
-    if res['data']['save_directory'] is not None:
+    if res['status'] == 'success':
         res2 = get_file_summary(res['data']['save_directory'])
 
-    return {
-        "result": res,
-        "summary": res2,
-        "code" : 200,
-    }
+        add_doc(865875466982883329, res['data']['filename'],  res2['data']['summary'])
+
+        return {
+            "result": res,
+            "summary": res2,
+            "code" : 200,
+        }
+
+    else:
+        return {
+            "result": res,
+            "code" : 400,
+        }
