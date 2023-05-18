@@ -9,7 +9,8 @@ from langchain.vectorstores import Chroma
 from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredEPubLoader, UnstructuredWordDocumentLoader, \
     UnstructuredFileLoader
 
-from cocroach_utils.database_utils import save_error
+from cocroach_utils.db_errors import save_error
+from cocroach_utils.db_docs import add_doc, get_doc_by_name
 
 load_dotenv()
 openai_api = os.environ.get("OPENAI_API_KEY")
@@ -49,7 +50,7 @@ def get_loader(filename):
         return None
 
 
-def create_vector_index(file):
+def create_vector_index(file, user_id, force):
     """
     Create a vector index from a file
     :param file:
@@ -63,11 +64,25 @@ def create_vector_index(file):
         }
 
     filename = f"./data/{file.filename}"
-    save_directory = os.path.join(persist_directory, filename.split("/")[-1].split(".")[0])
+
+    docs = get_doc_by_name(file.filename)
+    if not force:
+        if docs:
+            return {
+                    "status": "error",
+                    "message": "File already exists"
+            }
+
+    if not docs:
+        doc_id = add_doc(user_id, file.filename, "")
+    else:
+        doc_id = docs[0][0]
+
+    save_directory = os.path.join(persist_directory, str(doc_id))
     with open(Path(filename), "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
 
-    if not os.path.exists(os.path.join(save_directory, 'index')):
+    if not os.path.exists(os.path.join(save_directory, 'index')) or force:
 
         loader = get_loader(filename)
         if loader is None:
@@ -97,7 +112,8 @@ def create_vector_index(file):
             "message": "Index created successfully",
             "data": {
                 "filename": filename,
-                "save_directory": save_directory
+                "save_directory": save_directory,
+                "doc_id": str(doc_id)
             }
         }
 
@@ -107,6 +123,7 @@ def create_vector_index(file):
             "message": "Index already exists",
             "data": {
                 "filename": filename,
-                "save_directory": save_directory
+                "save_directory": save_directory,
+                "doc_id": str(doc_id)
             }
         }

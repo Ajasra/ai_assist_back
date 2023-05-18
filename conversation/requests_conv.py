@@ -6,7 +6,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 
-from cocroach_utils.database_utils import save_error
+from cocroach_utils.db_errors import save_error
 
 load_dotenv()
 
@@ -26,8 +26,7 @@ def get_file_summary(persist_dir):
     try:
 
         result = chain({"question": prompt_template}, return_only_outputs=True)
-        with open(os.path.join(persist_dir, "summary.txt"), "w") as f:
-            f.write(result["answer"])
+
         return {
             "status": "success",
             "message": "File summary",
