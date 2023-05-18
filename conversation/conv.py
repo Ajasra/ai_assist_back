@@ -2,12 +2,13 @@ import os
 from dotenv import load_dotenv
 
 from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQAWithSourcesChain
 
-from cocroach_utils.database_utils import save_error
+from cocroach_utils.db_errors import save_error
+from cocroach_utils.db_conv import add_conversation, get_conv_by_id
+from cocroach_utils.db_history import add_history
 
 load_dotenv()
 
@@ -41,14 +42,38 @@ def format_response(response_input):
         }
 
 
-def get_agent_response(prompt, conversation_id, document, debug):
-    if document is not None:
+def get_agent_response(prompt, conv_id, doc_id, user_id, debug):
+    if doc_id is not None:
 
-        cur_conversation = None
-
-        index_dir = os.path.join(persist_directory, document)
+        index_dir = os.path.join(persist_directory, str(doc_id))
         embeddings = OpenAIEmbeddings()
         docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
+
+        cur_conv = None
+
+        if conv_id is None or conv_id == -1 or conv_id == 0:
+            cur_conv = add_conversation(user_id, doc_id, title="New conversation")
+            print("New conversation added"
+                  "Conversation id: ", cur_conv)
+        else:
+            conv = get_conv_by_id(conv_id)
+            if conv is None:
+                save_error("Conversation not found")
+                return {
+                    "status": "error",
+                    "message": "Conversation not found",
+                    "conversation_id": conv_id
+                }
+            else:
+                cur_conv = conv_id
+
+        if cur_conv == -1:
+            save_error("Error while adding conversation")
+            return {
+                "status": "error",
+                "message": "Error while adding conversation",
+                "conversation_id": cur_conv
+            }
 
         _DEFAULT_TEMPLATE = """Given the context information answer the following question
                             If you don't know the answer, just say you dont know Don't try to make up an answer.
@@ -60,27 +85,19 @@ def get_agent_response(prompt, conversation_id, document, debug):
                             =========
                             question: {}""".format(prompt)
 
-        if conversation_id >= len(conversations) or len(conversations) == 0:
-            memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-            memories.append(memory)
-
-            conversations.append(
-                RetrievalQAWithSourcesChain.from_chain_type(llm=llm,chain_type="stuff",retriever=docsearch.as_retriever())
-            )
-            conversation_id = len(conversations) - 1
-            cur_conversation = conversations[conversation_id]
-        else:
-            cur_conversation = conversations[conversation_id]
+        cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(llm=llm,chain_type="stuff",retriever=docsearch.as_retriever())
 
         try:
             result = cur_conversation({"question": _DEFAULT_TEMPLATE})
             response = format_response(result["answer"])
+            add_history(cur_conv, prompt, response["answer"])
+
         except Exception as e:
             save_error(e)
             return {
                 "status": "error",
                 "message": "Error while getting response",
-                "conversation_id": conversation_id,
+                "conversation_id": cur_conv,
                 "data": {
                     "response": str(e),
                 }
@@ -93,7 +110,7 @@ def get_agent_response(prompt, conversation_id, document, debug):
                 "response": response["answer"],
                 "follow_up_questions": response["follow_up_questions"],
                 "source": response["source"],
-                "conversation_id": conversation_id
+                "conversation_id": cur_conv
             }
         }
 
@@ -102,7 +119,7 @@ def get_agent_response(prompt, conversation_id, document, debug):
         return {
             "status": "error",
             "message": "No document selected",
-            "conversation_id": conversation_id
+            "conversation_id": None
         }
 
 
