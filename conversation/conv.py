@@ -9,6 +9,7 @@ from langchain.chains import RetrievalQAWithSourcesChain
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_conv import add_conversation, get_conv_by_id
 from cocroach_utils.db_history import add_history
+from langchain.chains.router import MultiRetrievalQAChain
 
 load_dotenv()
 
@@ -122,11 +123,39 @@ def get_agent_response(prompt, conv_id, doc_id, user_id, debug):
             "conversation_id": None
         }
 
+def multichain():
+    print("Multichain")
 
-def get_conversation_count():
-    """Get conversation count.
+    embeddings = OpenAIEmbeddings()
+    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever()
+    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever()
 
-    Returns:
-        int: Conversation count.
-    """
-    return len(conversations)
+    retriever_infos = [
+        {
+            "name": "Cancer Culture",
+            "description": "Good for answering questions about the Cancer culture book",
+            "retriever": docsearch1
+        },
+        {
+            "name": "History and condition for creativity",
+            "description": "Good for answer questions about Creativity",
+            "retriever": docsearch2
+        }
+    ]
+
+    chain = MultiRetrievalQAChain.from_retrievers(llm, retriever_infos, verbose=True)
+
+    prompt = "What is the book cancer culture about?"
+
+    _DEFAULT_TEMPLATE = """Given the context information answer the following question
+                                If you don't know the answer, just say you dont know Don't try to make up an answer.
+                                =========
+                                Always answer in the format:
+                                ANSWER: <your answer>
+                                FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
+                                SOURCE: <do not make up source, give the page or the chapter from the document>
+                                =========
+                                question: {}""".format(prompt)
+
+    response = chain.run(prompt)
+    print(response)

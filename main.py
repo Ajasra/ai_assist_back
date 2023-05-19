@@ -2,7 +2,7 @@ import hashlib
 import os.path
 
 from pydantic import BaseModel
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv
@@ -122,7 +122,9 @@ async def get_indexes(body: UserId):
 
 
 @app.post("/docs/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...), user_id: int = usr_id,  force: bool = False):
+async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
+
+    print(user_id, force)
 
     res = create_vector_index(file, user_id, force)
 

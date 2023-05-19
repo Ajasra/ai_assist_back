@@ -53,6 +53,8 @@ def get_loader(filename):
 def create_vector_index(file, user_id, force):
     """
     Create a vector index from a file
+    :param force:
+    :param user_id:
     :param file:
     :return:
     """
@@ -76,7 +78,7 @@ def create_vector_index(file, user_id, force):
     if not docs:
         doc_id = add_doc(user_id, file.filename, "")
     else:
-        doc_id = docs[0][0]
+        doc_id = docs['doc_id']
 
     save_directory = os.path.join(persist_directory, str(doc_id))
     with open(Path(filename), "wb+") as file_object:
