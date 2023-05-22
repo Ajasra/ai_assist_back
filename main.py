@@ -3,6 +3,7 @@ import os.path
 
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv
@@ -10,13 +11,28 @@ from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs
 from conversation.requests_conv import get_file_summary
 from vectordb.vectordb import create_vector_index
-from conversation.conv import get_agent_response
+from conversation.conv import get_response_over_doc, get_simple_response
 
 app = FastAPI()
 debug = True
 
-#default values for start
-usr_id = 865875466982883329
+origins = [
+    "http://localhost.com",
+    "https://localhost.com",
+    "http://localhost",
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# default values for start
+usr_id = 0
 
 
 class ConvRequest(BaseModel):
@@ -24,9 +40,10 @@ class ConvRequest(BaseModel):
     conversation_id: int = None
     user_id: int = None
     document: int = None
+    memory: dict = None
 
 
-class UserId(BaseModel):
+class User(BaseModel):
     user_id: int = 0
     name: str = None
     email: str = None
@@ -35,14 +52,15 @@ class UserId(BaseModel):
     hash_password: str = None
 
 
-class ConversationId(BaseModel):
+class Conversation(BaseModel):
     conv_id: int = 0
     limit: int = 10
 
+
 class DocRequest(BaseModel):
-    user_id: int
     file: UploadFile = File(...)
-    force: bool = False
+    user_id: int = Form(...)
+    force: bool = Form(...)
 
 
 @app.get("/")
@@ -53,7 +71,18 @@ def read_root():
 # CONVERSATIONS
 @app.post("/conv/get_response")
 async def get_response(body: ConvRequest):
-    resp = get_agent_response(body.user_message, body.conversation_id, body.document, body.user_id, debug)
+    resp = get_simple_response(body.user_message, body.conversation_id, body.user_id, body.memory)
+
+    return {
+        "response": resp,
+        "debug": debug,
+        "code": 200
+    }
+
+
+@app.post("/conv/get_response_doc")
+async def get_response(body: ConvRequest):
+    resp = get_response_over_doc(body.user_message, body.conversation_id, body.document, body.user_id, body.memory)
 
     return {
         "response": resp,
@@ -63,8 +92,7 @@ async def get_response(body: ConvRequest):
 
 
 @app.post("/conv/get_user_conversations")
-async def get_user_conversation(body: UserId):
-
+async def get_user_conversation(body: User):
     result = get_user_conversations(body.user_id)
 
     return {
@@ -75,8 +103,7 @@ async def get_user_conversation(body: UserId):
 
 
 @app.post("/conv/get_selected_conv")
-async def get_selected_conv(body: ConversationId):
-
+async def get_selected_conv(body: Conversation):
     result = get_conv_by_id(body.conv_id)
 
     return {
@@ -88,21 +115,19 @@ async def get_selected_conv(body: ConversationId):
 
 # HISTORY
 @app.post("/conv/get_history")
-async def get_history(body: ConversationId):
-
+async def get_history(body: Conversation):
     result = get_history_for_conv(body.conv_id, body.limit)
 
     return {
-            "response": result,
-            "debug": debug,
-            "code": 200,
-        }
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
 
 
 # DOCS
 @app.post("/docs/get_docs/user_id")
-async def get_indexes(body: UserId):
-
+async def get_indexes(body: User):
     try:
         if body.user_id == 0:
             docs = get_all_docs()
@@ -122,11 +147,9 @@ async def get_indexes(body: UserId):
 
 
 @app.post("/docs/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
+async def create_upload_file(body: DocRequest):
 
-    print(user_id, force)
-
-    res = create_vector_index(file, user_id, force)
+    res = create_vector_index(body.file, body.user_id, body.force)
 
     if res['status'] == 'success':
         summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
@@ -146,11 +169,9 @@ async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(.
         }
 
 
-
 # USERS
 @app.post("/user/create")
-async def create_user(body: UserId):
-
+async def create_user(body: User):
     if body.name is None:
         return {
             "response": "Name is required",
@@ -192,7 +213,7 @@ async def create_user(body: UserId):
 
 
 @app.post("/user/login")
-async def login_user(body: UserId):
+async def login_user(body: User):
     user = get_user_by_email(body.email)
     print(user)
 
@@ -224,7 +245,7 @@ async def login_user(body: UserId):
 
 
 @app.post("/user/get_user")
-async def get_user(body: UserId):
+async def get_user(body: User):
     user = get_user_by_id(body.user_id)
 
     return {
@@ -234,7 +255,7 @@ async def get_user(body: UserId):
 
 
 @app.post("/user/update_user_password")
-async def update_user_password(body: UserId):
+async def update_user_password(body: User):
     user = get_user_by_id(body.user_id)
     psw = get_user_password(body.user_id)
     hs_function = hashlib.md5()
@@ -243,7 +264,6 @@ async def update_user_password(body: UserId):
 
     new_password = hs_function.update(body.password.encode('utf-8'))
     new_password = hs_function.hexdigest()
-
 
     if psw != old_password:
         return {

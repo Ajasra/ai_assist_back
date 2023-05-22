@@ -8,6 +8,7 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredEPubLoader, UnstructuredWordDocumentLoader, \
     UnstructuredFileLoader
+from langchain.document_loaders import DirectoryLoader
 
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_docs import add_doc, get_doc_by_name
@@ -129,3 +130,20 @@ def create_vector_index(file, user_id, force):
                 "doc_id": str(doc_id)
             }
         }
+
+
+def create_vector_index_folder():
+
+    data_directory = './data/summary'
+
+    save_directory = os.path.join(persist_directory, 'summary')
+    loader = DirectoryLoader(data_directory)
+    documents = loader.load()
+    print(len(documents))
+
+    text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    docs = text_splitter.split_documents(documents)
+
+    embedding = OpenAIEmbeddings()
+    vectordb = Chroma.from_documents(documents=docs, embedding=embedding, persist_directory=save_directory)
+    vectordb.persist()
