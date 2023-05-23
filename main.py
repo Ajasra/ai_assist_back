@@ -147,9 +147,10 @@ async def get_indexes(body: User):
 
 
 @app.post("/docs/uploadfile/")
-async def create_upload_file(body: DocRequest):
+async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
 
-    res = create_vector_index(body.file, body.user_id, body.force)
+    res = create_vector_index(file, user_id, force)
+    print('Uploading')
 
     if res['status'] == 'success':
         summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
