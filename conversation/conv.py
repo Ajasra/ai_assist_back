@@ -146,6 +146,8 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                             =========
                             question: {}""".format(prompt)
 
+        _DEFAULT_TEMPLATE = prompt
+
         cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -163,7 +165,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
             return {
                 "status": "error",
                 "message": "Error while getting response",
-                "conversation_id": cur_conv,
+                "conversation_id": str(cur_conv),
                 "data": {
                     "response": str(e),
                 }
@@ -176,7 +178,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 "response": response["answer"],
                 "follow_up_questions": response["follow_up_questions"],
                 "source": result["source_documents"],
-                "conversation_id": cur_conv
+                "conversation_id": str(cur_conv)
             }
         }
 

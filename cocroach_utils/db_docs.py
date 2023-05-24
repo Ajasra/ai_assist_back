@@ -15,6 +15,7 @@ def get_user_docs(user_id):
     :param user_id:
     :return:
     """
+    print("Get user docs" , user_id)
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -24,10 +25,10 @@ def get_user_docs(user_id):
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
-                        "doc_id": doc[0],
+                        "doc_id": str(doc[0]),
                         "name": doc[1],
                         "summary": doc[2],
-                        "user_ud": doc[3],
+                        "user_id": str(doc[3]),
                         "updated": doc[4]
                     })
                 return docs
@@ -53,10 +54,10 @@ def get_doc_by_id(doc_id):
                     (doc_id,))
                 doc = cur.fetchone()
                 return {
-                    "doc_id": doc[0],
+                    "doc_id": str(doc[0]),
                     "name": doc[1],
                     "summary": doc[2],
-                    "user_ud": doc[3],
+                    "user_id": str(doc[3]),
                     "updated": doc[4]
                 }
         except Exception as err:
@@ -80,10 +81,10 @@ def get_all_docs():
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
-                        "doc_id": doc[0],
+                        "doc_id": str(doc[0]),
                         "name": doc[1],
                         "summary": doc[2],
-                        "user_ud": doc[3],
+                        "user_id": str(doc[3]),
                         "updated": doc[4]
                     })
                 return docs
@@ -109,10 +110,10 @@ def get_doc_by_name(doc_name):
                     (doc_name,))
                 doc = cur.fetchone()
                 return {
-                        "doc_id": doc[0],
+                        "doc_id": str(doc[0]),
                         "name": doc[1],
                         "summary": doc[2],
-                        "user_ud": doc[3],
+                        "user_id": str(doc[3]),
                         "updated": doc[4]
                     }
         except Exception as err:

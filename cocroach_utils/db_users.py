@@ -16,7 +16,7 @@ def get_user_by_id(user_id):
                     (user_id,))
                 doc = cur.fetchone()
                 return {
-                    "user_id": doc[0],
+                    "user_id": str(doc[0]),
                     "name": doc[1],
                     "email": doc[2]
                 }
@@ -64,7 +64,7 @@ def get_user_by_email(email):
                     (email,))
                 doc = cur.fetchone()
                 return {
-                    "user_id": doc[0],
+                    "user_id": str(doc[0]),
                     "name": doc[1],
                     "email": doc[2],
                     "password": doc[3]

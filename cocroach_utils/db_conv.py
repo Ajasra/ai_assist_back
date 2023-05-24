@@ -18,9 +18,9 @@ def get_user_conversations(user_id):
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
-                        "conv_id": doc[0],
-                        "user_id": doc[1],
-                        "doc_id": doc[2],
+                        "conv_id": str(doc[0]),
+                        "user_id": str(doc[1]),
+                        "doc_id": str(doc[2]),
                         "title": doc[3]
                     })
                 return docs
@@ -46,9 +46,9 @@ def get_conv_by_id(conversation_id):
                     (conversation_id,))
                 doc = cur.fetchone()
                 return {
-                    "conv_id": doc[0],
-                    "user_id": doc[1],
-                    "doc_id": doc[2],
+                    "conv_id": str(doc[0]),
+                    "user_id": str(doc[1]),
+                    "doc_id": str(doc[2]),
                     "title": doc[3]
                 }
         except Exception as err:
