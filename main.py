@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv
-from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id
+from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs
 from conversation.requests_conv import get_file_summary
 from vectordb.vectordb import create_vector_index
@@ -55,6 +55,7 @@ class User(BaseModel):
 class Conversation(BaseModel):
     conv_id: int = 0
     limit: int = 10
+    title: str = None
 
 
 class DocRequest(BaseModel):
@@ -117,6 +118,33 @@ async def get_selected_conv(body: Conversation):
 @app.post("/conv/get_history")
 async def get_history(body: Conversation):
     result = get_history_for_conv(body.conv_id, body.limit)
+
+    return {
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
+
+@app.post("/conv/update")
+async def update_conv(body: Conversation):
+
+    if body.title is None:
+        return {
+            "response": "Title is required",
+            "code": 400,
+        }
+    result = update_conversation(body.conv_id, body.title)
+
+    return {
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
+
+
+@app.post("/conv/delete")
+async def delete_conv(body: Conversation):
+    result = delete_conversation(body.conv_id)
 
     return {
         "response": result,
