@@ -6,7 +6,20 @@ load_dotenv()
 database_url = os.getenv("CR_DATABASE_URL")
 conn = None
 
-try:
-    conn = psycopg2.connect(database_url)
-except Exception as e:
-    print(str(e))
+
+def connect_to_db():
+    """
+    Connect to the database
+    :return:
+    """
+    global conn
+    if conn is None:
+        try:
+            conn = psycopg2.connect(database_url)
+        except Exception as e:
+            print(str(e))
+
+
+connect_to_db()
+
+

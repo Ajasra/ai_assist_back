@@ -15,7 +15,7 @@ def get_history_for_conv(conversation_id, limit=10):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM history WHERE conv_id = %s ORDER BY time DESC LIMIT %s",
+                    "SELECT * FROM history WHERE conv_id = %s ORDER BY time ASC LIMIT %s",
                     (conversation_id, limit))
                 # format the response into the list of dict with keys
                 # hist_id, conv_id, prompt, answer, feedback, time
