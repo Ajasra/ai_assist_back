@@ -1,4 +1,6 @@
 import os
+
+import tiktoken
 from dotenv import load_dotenv
 from langchain import LLMChain, PromptTemplate
 
@@ -6,16 +8,18 @@ from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
 from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains import RetrievalQAWithSourcesChain, RetrievalQA
 
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_conv import add_conversation, get_conv_by_id
 from cocroach_utils.db_history import add_history
 from langchain.chains.router import MultiRetrievalQAChain
 
+from vectordb.vectordb import get_embedding_model
+
 load_dotenv()
 
-llm = ChatOpenAI(temperature=.0, model_name="gpt-3.5-turbo")
+llm = ChatOpenAI(temperature=.0, model_name="gpt-3.5-turbo", verbose=True)
 
 persist_directory = './db'
 
@@ -32,7 +36,7 @@ def format_response(response_input):
     print("Response input: ", response_input)
     data = response_input.split("FOLLOW UP QUESTIONS:")
     if len(data) > 1:
-        answer = data[0].strip()
+        answer = data[0].strip().replace("ANSWER:", "")
         follow_up_questions = data[1].replace("FOLLOWUP QUESTIONS:","").strip().split("\n")
         return {
             "answer": answer,
@@ -41,7 +45,7 @@ def format_response(response_input):
 
     else:
         return {
-            "answer": response_input,
+            "answer": response_input.replace("ANSWER:", "").strip(),
             "follow_up_questions": [],
             "source": ""
         }
@@ -69,6 +73,32 @@ def get_conv_id(conv_id, user_id, doc_id):
             cur_conv = conv_id
 
     return cur_conv
+
+
+def num_tokens_from_messages(message, model="gpt-3.5-turbo"):
+    """Returns the number of tokens used by a list of messages."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+    if model == "gpt-3.5-turbo":
+        print("Warning: gpt-3.5-turbo may change over time. Returning num tokens assuming gpt-3.5-turbo-0301.")
+        return num_tokens_from_messages(message, model="gpt-3.5-turbo-0301")
+    elif model == "gpt-4":
+        print("Warning: gpt-4 may change over time. Returning num tokens assuming gpt-4-0314.")
+        return num_tokens_from_messages(message, model="gpt-4-0314")
+    elif model == "gpt-3.5-turbo-0301":
+        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_name = -1  # if there's a name, the role is omitted
+    elif model == "gpt-4-0314":
+        tokens_per_message = 3
+        tokens_per_name = 1
+    else:
+        raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
+    num_tokens = len(encoding.encode(message))
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
 
 
 def get_simple_response(prompt, conv_id, user_id, memory):
@@ -126,7 +156,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
     if doc_id is not None:
 
         index_dir = os.path.join(persist_directory, str(doc_id))
-        embeddings = OpenAIEmbeddings()
+        embeddings = get_embedding_model()
         docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
 
         cur_conv = get_conv_id(conv_id, user_id, doc_id)
@@ -146,18 +176,20 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                             =========
                             question: {}""".format(prompt)
 
-        _DEFAULT_TEMPLATE = prompt
+        # _DEFAULT_TEMPLATE = prompt
 
-        cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(
+        retriever = docsearch.as_retriever(enable_limit=True, limit=5)
+
+        cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-            retriever=docsearch.as_retriever(),
+            retriever=retriever,
             return_source_documents=True
         )
 
         try:
-            result = cur_conversation({"question": _DEFAULT_TEMPLATE})
-            response = format_response(result["answer"])
+            result = cur_conversation({"query": _DEFAULT_TEMPLATE})
+            response = format_response(result['result'])
             add_history(cur_conv, prompt, response["answer"])
 
         except Exception as e:
