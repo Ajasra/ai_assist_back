@@ -13,19 +13,46 @@ from langchain.document_loaders import DirectoryLoader
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_docs import add_doc, get_doc_by_name
 
+# from langchain.embeddings import HuggingFaceEmbeddings
+# from langchain.embeddings import HuggingFaceInstructEmbeddings
+
 load_dotenv()
 openai_api = os.environ.get("OPENAI_API_KEY")
 
-chunk_size = 1000
-chunk_overlap = 100
+# instructor_embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl",
+#                                                       model_kwargs={"device": "cpu"})
+
+chunk_size = 512
+chunk_overlap = 32
 persist_directory = './db'
 data_directory = './data'
+local_embeddings = False
+
+
+# if local_embeddings:
+#     model_name = "sentence-transformers/all-mpnet-base-v2"
+#     hf = HuggingFaceEmbeddings(model_name=model_name)
+
+
 
 # check if directory exists
 if not os.path.exists(data_directory):
     os.makedirs(data_directory)
 if not os.path.exists(persist_directory):
     os.makedirs(persist_directory)
+
+
+def get_embedding_model(local=False):
+    """
+    Get the embedding model
+    :param local:
+    :return:
+    """
+    return OpenAIEmbeddings()
+    # if local:
+    #     return instructor_embeddings
+    # else:
+    #     return OpenAIEmbeddings()
 
 
 def get_loader(filename):
@@ -144,6 +171,6 @@ def create_vector_index_folder():
     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     docs = text_splitter.split_documents(documents)
 
-    embedding = OpenAIEmbeddings()
+    embedding = get_embedding_model()
     vectordb = Chroma.from_documents(documents=docs, embedding=embedding, persist_directory=save_directory)
     vectordb.persist()
