@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv
-from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation
+from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation, \
+    add_conversation
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs
 from conversation.requests_conv import get_file_summary
 from vectordb.vectordb import create_vector_index
@@ -56,6 +57,8 @@ class Conversation(BaseModel):
     conv_id: int = 0
     limit: int = 10
     title: str = None
+    user_id: int = None
+    doc_id: int = None
 
 
 class DocRequest(BaseModel):
@@ -118,6 +121,36 @@ async def get_selected_conv(body: Conversation):
 @app.post("/conv/get_history")
 async def get_history(body: Conversation):
     result = get_history_for_conv(body.conv_id, body.limit)
+
+    return {
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
+
+
+@app.post("/conv/create")
+async def create_conv(body: Conversation):
+
+    if body.user_id is None:
+        return {
+            "response": "User ID is required",
+            "code": 400,
+        }
+
+    if body.doc_id is None:
+        return {
+            "response": "Document ID is required",
+            "code": 400,
+        }
+
+    if body.title is None:
+        return {
+            "response": "Title is required",
+            "code": 400,
+        }
+
+    result = add_conversation(body.user_id, body.doc_id, body.title)
 
     return {
         "response": result,
@@ -244,11 +277,16 @@ async def create_user(body: User):
 @app.post("/user/login")
 async def login_user(body: User):
     user = get_user_by_email(body.email)
-    print(user)
 
     if len(user) == 0:
         return {
             "response": "User not found",
+            "code": 400,
+        }
+
+    if user['active'] == 0:
+        return {
+            "response": "User is not active",
             "code": 400,
         }
 

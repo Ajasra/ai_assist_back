@@ -61,9 +61,10 @@ def get_conv_id(conv_id, user_id, doc_id):
     """
     cur_conv = None
     if conv_id is None or conv_id == -1 or conv_id == 0:
-        cur_conv = add_conversation(user_id, doc_id, title="New conversation")
-        print("New conversation added"
-              "Conversation id: ", cur_conv)
+        # cur_conv = add_conversation(user_id, doc_id, title="New conversation")
+        # print("New conversation added"
+        #       "Conversation id: ", cur_conv)
+        pass
     else:
         conv = get_conv_by_id(conv_id)
         if conv is None:

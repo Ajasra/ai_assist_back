@@ -74,7 +74,7 @@ def add_conversation(user_id, doc_id, title="New conversation"):
                     "INSERT INTO conversations (user_id, doc_id, title) VALUES (%s, %s, %s) RETURNING conv_id",
                     (user_id, doc_id, title))
                 conn.commit()
-                return cur.fetchone()[0]
+                return str(cur.fetchone()[0])
         except Exception as err:
             save_error(err)
             return -1

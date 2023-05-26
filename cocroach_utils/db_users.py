@@ -18,7 +18,8 @@ def get_user_by_id(user_id):
                 return {
                     "user_id": str(doc[0]),
                     "name": doc[1],
-                    "email": doc[2]
+                    "email": doc[2],
+                    "active": doc[4],
                 }
         except Exception as err:
             save_error(err)
@@ -63,11 +64,13 @@ def get_user_by_email(email):
                     "SELECT * FROM users WHERE email = %s",
                     (email,))
                 doc = cur.fetchone()
+                print(doc)
                 return {
                     "user_id": str(doc[0]),
                     "name": doc[1],
                     "email": doc[2],
-                    "password": doc[3]
+                    "password": doc[3],
+                    "active": doc[4],
                 }
         except Exception as err:
             save_error(err)
@@ -89,7 +92,14 @@ def get_user_by_username(username):
                 cur.execute(
                     "SELECT * FROM users WHERE name = %s",
                     (username,))
-                return cur.fetchone()
+                doc = cur.fetchone()
+                return {
+                    "user_id": str(doc[0]),
+                    "name": doc[1],
+                    "email": doc[2],
+                    "password": doc[3],
+                    "active": doc[5],
+                }
         except Exception as err:
             save_error(err)
             return []
@@ -108,7 +118,16 @@ def get_all_users():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM users")
-                return cur.fetchall()
+                users = []
+                for doc in cur.fetchall():
+                    users.append({
+                        "user_id": str(doc[0]),
+                        "name": doc[1],
+                        "email": doc[2],
+                        "password": doc[3],
+                        "active": doc[5],
+                    })
+                return users
         except Exception as err:
             save_error(err)
             return []
