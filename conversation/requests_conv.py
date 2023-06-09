@@ -21,7 +21,7 @@ def get_file_summary(persist_dir):
     embeddings = get_embedding_model()
     docsearch = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
     chain = RetrievalQA.from_chain_type(ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo"),
-                                                        chain_type="stuff", retriever=docsearch.as_retriever())
+                                                        chain_type="stuff", retriever=docsearch.as_retriever(search_kwargs={"k": 3}))
 
     prompt_template = "Give me a summary of the document. Try to include details from the document as a a " \
                       "main ideas and concepts. \n"

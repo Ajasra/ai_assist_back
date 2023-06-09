@@ -22,11 +22,15 @@ origins = [
     "https://localhost.com",
     "http://localhost",
     "http://localhost:3000",
+    "http://sokaris.link:3000",
+    "http://sokaris.link",
+    "https://assistant.sokaris.link",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -179,7 +179,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
 
         # _DEFAULT_TEMPLATE = prompt
 
-        retriever = docsearch.as_retriever(enable_limit=True, limit=5)
+        retriever = docsearch.as_retriever(enable_limit=True, limit=5, search_kwargs={"k": 3})
 
         cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
@@ -233,8 +233,8 @@ def multichain():
     print("Multichain")
 
     embeddings = OpenAIEmbeddings()
-    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever()
-    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever()
+    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever(search_kwargs={"k": 3})
+    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever(search_kwargs={"k": 3})
 
     retriever_infos = [
         {
@@ -279,7 +279,7 @@ def get_summary_response(prompt):
     embeddings = OpenAIEmbeddings()
     docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
     cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(llm=llm, chain_type="stuff",
-                                                                  retriever=docsearch.as_retriever())
+                                                                  retriever=docsearch.as_retriever(search_kwargs={"k": 3}))
 
     _DEFAULT_TEMPLATE = """Given the context information answer the following question
                                 If you don't know the answer, just say you dont know Don't try to make up an answer.

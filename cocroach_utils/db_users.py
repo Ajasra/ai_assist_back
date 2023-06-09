@@ -148,7 +148,7 @@ def add_user(username, email, password):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO users (name, email, password) VALUES (%s, %s, %s) RETURNING user_id",
+                    "INSERT INTO users (name, email, password, active) VALUES (%s, %s, %s, True) RETURNING user_id",
                     (username, email, password))
                 conn.commit()
                 return cur.fetchone()[0]
