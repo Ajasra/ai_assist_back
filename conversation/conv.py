@@ -10,9 +10,11 @@ from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTem
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQAWithSourcesChain, RetrievalQA
 
+from langchain.memory import ConversationBufferMemory
+
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_conv import add_conversation, get_conv_by_id
-from cocroach_utils.db_history import add_history
+from cocroach_utils.db_history import add_history, get_history_for_conv
 from langchain.chains.router import MultiRetrievalQAChain
 
 from vectordb.vectordb import get_embedding_model
@@ -34,15 +36,32 @@ def format_response(response_input):
     :return:
     """
     print("Response input: ", response_input)
-    data = response_input.split("FOLLOW UP QUESTIONS:")
+    data = []
+    # check if there are follow up questions regardless of uppercase or lowercase
+    if "FOLLOW UP QUESTIONS:" in response_input:
+        data = response_input.split("FOLLOW UP QUESTIONS:")
+    elif "FOLLOWUP QUESTIONS:" in response_input:
+        data = response_input.split("FOLLOWUP QUESTIONS:")
+    elif "Follow up questions:" in response_input:
+        data = response_input.split("Follow up questions:")
+    elif "Followup questions:" in response_input:
+        data = response_input.split("Followup questions:")
+    elif "follow up questions:" in response_input:
+        data = response_input.split("follow up questions:")
+    elif "followup questions:" in response_input:
+        data = response_input.split("followup questions:")
+    elif "Followup" in response_input:
+        data = response_input.split("Followup:")
+    elif "FOLLOWUP" in response_input:
+        data = response_input.split("FOLLOWUP:")
+
     if len(data) > 1:
         answer = data[0].strip().replace("ANSWER:", "")
-        follow_up_questions = data[1].replace("FOLLOWUP QUESTIONS:","").strip().split("\n")
+        follow_up_questions = data[1].replace("FOLLOWUP QUESTIONS:", "").strip().split("\n")
         return {
             "answer": answer,
             "follow_up_questions": follow_up_questions
         }
-
     else:
         return {
             "answer": response_input.replace("ANSWER:", "").strip(),
@@ -168,28 +187,70 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 "conversation_id": conv_id
             }
 
-        _DEFAULT_TEMPLATE = """Given the context information answer the following question
+        _DEFAULT_TEMPLATE = """Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
                             If you don't know the answer, just say you dont know Don't try to make up an answer.
                             =========
-                            Always answer in the format:
-                            ANSWER: <your answer>
-                            FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
+                            Always answer in the json format with the following fields:
+                            "answer": "<your answer>",
+                            "followup": "<list of 3 suggested questions related to context and conversation for better understanding>"
                             =========
-                            question: {}""".format(prompt)
+                            ------
+                            <ctx>
+                            {context}
+                            </ctx>
+                            ------
+                            <hs>
+                            {history}
+                            </hs>
+                            ------
+                            {question}
+                            Answer:"""
+
+        promptTmp = PromptTemplate(
+            input_variables=["history", "context", "question"],
+            template=_DEFAULT_TEMPLATE,
+        )
 
         # _DEFAULT_TEMPLATE = prompt
 
         retriever = docsearch.as_retriever(enable_limit=True, limit=5, search_kwargs={"k": 3})
 
+        memory_obj = ConversationBufferMemory(
+                    memory_key="history",
+                    input_key="question")
+
+        if memory != -1:
+            # get history from db
+            history = get_history_for_conv(cur_conv, 2)
+            if history is not None:
+                # from last to first
+                history.reverse()
+                for hist in history:
+                    print(hist["prompt"])
+                    memory_obj.save_context(
+                        {"question": hist["prompt"]},
+                        {"output": hist["answer"]}
+                    )
+
+            print(memory_obj.load_memory_variables({}))
+
+
         cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
             retriever=retriever,
-            return_source_documents=True
+            return_source_documents=True,
+            verbose=False,
+            chain_type_kwargs={
+                "verbose": True,
+                "prompt": promptTmp,
+                "memory": memory_obj,
+            }
         )
 
         try:
-            result = cur_conversation({"query": _DEFAULT_TEMPLATE})
+            result = cur_conversation({"query": prompt})
+            print(result)
             response = format_response(result['result'])
             add_history(cur_conv, prompt, response["answer"])
 

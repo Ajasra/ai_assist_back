@@ -15,7 +15,7 @@ def get_history_for_conv(conversation_id, limit=10):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM history WHERE conv_id = %s ORDER BY time ASC LIMIT %s",
+                    "SELECT * FROM history WHERE conv_id = %s ORDER BY time DESC LIMIT %s",
                     (conversation_id, limit))
                 # format the response into the list of dict with keys
                 # hist_id, conv_id, prompt, answer, feedback, time
@@ -31,6 +31,7 @@ def get_history_for_conv(conversation_id, limit=10):
                     })
                 return docs
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -60,6 +61,7 @@ def get_selected_history(history_id):
                     "feedback": doc[5]
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -86,6 +88,7 @@ def add_history(conv_id, prompt, answer, feedback=0):
                 conn.commit()
                 return cur.fetchone()[0]
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return -1
     else:
@@ -108,6 +111,7 @@ def delete_history_by_id(history_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -130,6 +134,7 @@ def delete_history_by_conv_id(conv_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:

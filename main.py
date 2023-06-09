@@ -45,7 +45,7 @@ class ConvRequest(BaseModel):
     conversation_id: int = None
     user_id: int = None
     document: int = None
-    memory: dict = None
+    memory: int = 10
 
 
 class User(BaseModel):
@@ -181,6 +181,8 @@ async def update_conv(body: Conversation):
 
 @app.post("/conv/delete")
 async def delete_conv(body: Conversation):
+
+    print(body.conv_id)
     result = delete_conversation(body.conv_id)
 
     return {

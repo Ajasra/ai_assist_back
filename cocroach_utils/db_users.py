@@ -22,6 +22,7 @@ def get_user_by_id(user_id):
                     "active": doc[4],
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -44,6 +45,7 @@ def get_user_password(user_id):
                 doc = cur.fetchone()
                 return doc[0]
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -73,6 +75,7 @@ def get_user_by_email(email):
                     "active": doc[4],
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -101,6 +104,7 @@ def get_user_by_username(username):
                     "active": doc[5],
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -129,6 +133,7 @@ def get_all_users():
                     })
                 return users
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -153,6 +158,7 @@ def add_user(username, email, password):
                 conn.commit()
                 return cur.fetchone()[0]
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return -1
     else:
@@ -178,6 +184,7 @@ def update_user(user_id, username, email, password):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -200,6 +207,7 @@ def delete_user(user_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:

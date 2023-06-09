@@ -33,6 +33,7 @@ def get_user_docs(user_id):
                     })
                 return docs
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -61,6 +62,7 @@ def get_doc_by_id(doc_id):
                     "updated": doc[4]
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -89,6 +91,7 @@ def get_all_docs():
                     })
                 return docs
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -117,6 +120,7 @@ def get_doc_by_name(doc_name):
                         "updated": doc[4]
                     }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -143,6 +147,7 @@ def add_doc(user_id, doc_name, doc_text):
                 conn.commit()
                 return cur.fetchone()[0]
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return -1
     else:
@@ -167,6 +172,7 @@ def update_doc_summary_by_id(doc_id, doc_text):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -190,6 +196,7 @@ def update_doc_name_by_id(doc_id, doc_name):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -213,6 +220,7 @@ def delete_doc_by_id(doc_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:

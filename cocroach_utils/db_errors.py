@@ -20,6 +20,7 @@ def save_error(error, metadata=None):
                     (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
                 conn.commit()
         except Exception as err:
+            conn.rollback()
             print(str(err))
         pass
 
@@ -37,6 +38,7 @@ def get_errors():
                     "SELECT * FROM errors")
                 return cur.fetchall()
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -57,6 +59,7 @@ def get_errors_by_time(start_time, end_time):
                     (pd.Timestamp(start_time, unit='s'), pd.Timestamp(end_time, unit='s')))
                 return cur.fetchall()
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:

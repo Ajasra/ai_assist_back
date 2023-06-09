@@ -25,6 +25,7 @@ def get_user_conversations(user_id):
                     })
                 return docs
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -52,6 +53,7 @@ def get_conv_by_id(conversation_id):
                     "title": doc[3]
                 }
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return []
     else:
@@ -76,6 +78,7 @@ def add_conversation(user_id, doc_id, title="New conversation"):
                 conn.commit()
                 return str(cur.fetchone()[0])
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return -1
     else:
@@ -99,6 +102,7 @@ def update_conversation(conversation_id, title):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -122,6 +126,7 @@ def delete_conversation(conversation_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
@@ -149,6 +154,7 @@ def delete_conversation_by_user(user_id):
                 conn.commit()
                 return True
         except Exception as err:
+            conn.rollback()
             save_error(err)
             return False
     else:
