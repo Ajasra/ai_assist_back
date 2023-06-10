@@ -64,6 +64,8 @@ def format_response(response_input):
         answer = data[0].strip().replace("answer:", "")
         answer = data[0].strip().replace("Answer:", "")
         follow_up_questions = data[1].strip().split("\n")
+        if len(follow_up_questions) == 1:
+            follow_up_questions = data[1].strip().split("?")
         return {
             "answer": answer,
             "follow_up_questions": follow_up_questions
