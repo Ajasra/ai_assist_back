@@ -54,10 +54,16 @@ def format_response(response_input):
         data = response_input.split("Followup:")
     elif "FOLLOWUP" in response_input:
         data = response_input.split("FOLLOWUP:")
+    elif "followup" in response_input:
+        data = response_input.split("followup:")
+    elif "follow-up" in response_input:
+        data = response_input.split("follow-up:")
 
     if len(data) > 1:
         answer = data[0].strip().replace("ANSWER:", "")
-        follow_up_questions = data[1].replace("FOLLOWUP QUESTIONS:", "").strip().split("\n")
+        answer = data[0].strip().replace("answer:", "")
+        answer = data[0].strip().replace("Answer:", "")
+        follow_up_questions = data[1].strip().split("\n")
         return {
             "answer": answer,
             "follow_up_questions": follow_up_questions
