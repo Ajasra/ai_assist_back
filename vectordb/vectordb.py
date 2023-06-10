@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter, TokenTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredEPubLoader, UnstructuredWordDocumentLoader, \
     UnstructuredFileLoader
@@ -122,7 +122,9 @@ def create_vector_index(file, user_id, force):
             }
 
         documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        # text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        text_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+                                          encoding_name="cl100k_base")
         docs = text_splitter.split_documents(documents)
 
         try:
