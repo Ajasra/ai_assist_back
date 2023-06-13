@@ -7,7 +7,7 @@ from langchain import LLMChain, PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import Chroma, DocArrayInMemorySearch
 from langchain.chains import RetrievalQAWithSourcesChain, RetrievalQA
 
 from langchain.memory import ConversationBufferMemory
@@ -221,7 +221,9 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
 
         # _DEFAULT_TEMPLATE = prompt
 
-        retriever = docsearch.as_retriever(enable_limit=True, limit=5, search_kwargs={"k": 3})
+        retriever = docsearch.as_retriever(enable_limit=True, search_kwargs={"k": 3})
+
+
 
         memory_obj = ConversationBufferMemory(
                     memory_key="history",
@@ -240,8 +242,19 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                         {"output": hist["answer"]}
                     )
 
-            print(memory_obj.load_memory_variables({}))
+            # print(memory_obj.load_memory_variables({}))
 
+        sources = retriever.get_relevant_documents(prompt)
+
+        if len(sources) == 0:
+
+            # TODO: Rewrite the prompt with the API (give summary of the document and the name of the document)
+
+            return {
+                "status": "error",
+                "message": "No relevant documents found, please clarify the question",
+                "conversation_id": str(cur_conv)
+            }
 
         cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
@@ -250,7 +263,6 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
             return_source_documents=True,
             verbose=False,
             chain_type_kwargs={
-                "verbose": True,
                 "prompt": promptTmp,
                 "memory": memory_obj,
             }
