@@ -1,8 +1,9 @@
 import time
 import pandas as pd
+import psycopg2 as psycopg2
 
-from cocroach_utils.database_utils import conn
 from cocroach_utils.db_errors import save_error
+from cocroach_utils.database_utils import connect_to_db
 
 
 def get_history_for_conv(conversation_id, limit=10):
@@ -11,6 +12,7 @@ def get_history_for_conv(conversation_id, limit=10):
     :param conversation_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -45,6 +47,7 @@ def get_selected_history(history_id):
     :param history_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -78,6 +81,7 @@ def add_history(conv_id, prompt, answer, feedback=0):
     :param feedback:
     :return: history_id
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -102,6 +106,7 @@ def delete_history_by_id(history_id):
     :param history_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -125,6 +130,7 @@ def delete_history_by_conv_id(conv_id):
     :param conv_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:

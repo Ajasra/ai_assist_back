@@ -18,6 +18,15 @@ def connect_to_db():
             conn = psycopg2.connect(database_url)
         except Exception as e:
             print(str(e))
+    else:
+        if conn.closed == 1:
+            print('Reconnecting to database')
+            try:
+                conn = psycopg2.connect(database_url)
+                return conn
+            except Exception as e:
+                print(str(e))
+        return conn
 
 
 connect_to_db()

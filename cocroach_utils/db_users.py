@@ -1,5 +1,10 @@
-from cocroach_utils.database_utils import conn
+import psycopg2 as psycopg2
+import os
+from dotenv import load_dotenv
+
 from cocroach_utils.db_errors import save_error
+from cocroach_utils.database_utils import connect_to_db
+
 
 
 def get_user_by_id(user_id):
@@ -8,6 +13,8 @@ def get_user_by_id(user_id):
     :param user_id:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -36,6 +43,8 @@ def get_user_password(user_id):
     :param user_id:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -59,6 +68,8 @@ def get_user_by_email(email):
     :param email:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -66,7 +77,6 @@ def get_user_by_email(email):
                     "SELECT * FROM users WHERE email = %s",
                     (email,))
                 doc = cur.fetchone()
-                print(doc)
                 return {
                     "user_id": str(doc[0]),
                     "name": doc[1],
@@ -89,6 +99,8 @@ def get_user_by_username(username):
     :param username:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -117,6 +129,8 @@ def get_all_users():
     Get all users from the database
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -149,6 +163,8 @@ def add_user(username, email, password):
     :param password:
     :return: user_id
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -175,6 +191,8 @@ def update_user(user_id, username, email, password):
     :param password:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -182,6 +200,7 @@ def update_user(user_id, username, email, password):
                     "UPDATE users SET name = %s, email = %s, password = %s WHERE user_id = %s",
                     (username, email, password, user_id))
                 conn.commit()
+                conn.close()
                 return True
         except Exception as err:
             conn.rollback()
@@ -198,6 +217,8 @@ def delete_user(user_id):
     :param user_id:
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:

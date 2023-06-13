@@ -1,11 +1,9 @@
-import os
 import time
 import pandas as pd
-import psycopg2
-from dotenv import load_dotenv
 
 from cocroach_utils.db_errors import save_error
-from cocroach_utils.database_utils import conn
+
+from cocroach_utils.database_utils import connect_to_db
 
 
 # GET
@@ -15,7 +13,8 @@ def get_user_docs(user_id):
     :param user_id:
     :return:
     """
-    print("Get user docs" , user_id)
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -47,6 +46,7 @@ def get_doc_by_id(doc_id):
     :param doc_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -75,6 +75,7 @@ def get_all_docs():
     Get all docs
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -105,6 +106,7 @@ def get_doc_by_name(doc_name):
     :param doc_name:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -138,6 +140,7 @@ def add_doc(user_id, doc_name, doc_text):
     :param doc_text:
     :return: doc_id
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -163,6 +166,7 @@ def update_doc_summary_by_id(doc_id, doc_text):
     :param doc_text:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -187,6 +191,7 @@ def update_doc_name_by_id(doc_id, doc_name):
     :param doc_name:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -211,6 +216,7 @@ def delete_doc_by_id(doc_id):
     :param doc_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:

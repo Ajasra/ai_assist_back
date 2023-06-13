@@ -24,13 +24,14 @@ origins = [
     "http://localhost:3000",
     "http://sokaris.link:3000",
     "http://sokaris.link",
-    "https://assistant.sokaris.link",
+    "http://assistant.sokaris.link",
+    "https://fr.sokaris.link",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=origins,
-    allow_origins=["*"],
+    allow_origins=origins,
+    # allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -216,23 +217,29 @@ async def get_indexes(body: User):
 @app.post("/docs/uploadfile/")
 async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
 
-    res = create_vector_index(file, user_id, force)
-    print('Uploading')
+    try:
+        res = create_vector_index(file, user_id, force)
+        print('Uploading')
 
-    if res['status'] == 'success':
-        summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
-        if summary['status'] == 'success':
-            update_doc_summary_by_id(res['data']['doc_id'], summary['data']['summary'])
+        if res['status'] == 'success':
+            summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
+            if summary['status'] == 'success':
+                update_doc_summary_by_id(res['data']['doc_id'], summary['data']['summary'])
 
+            return {
+                "result": res,
+                "summary": summary,
+                "code": 200,
+            }
+
+        else:
+            return {
+                "result": res,
+                "code": 400,
+            }
+    except Exception as e:
         return {
-            "result": res,
-            "summary": summary,
-            "code": 200,
-        }
-
-    else:
-        return {
-            "result": res,
+            "result": str(e),
             "code": 400,
         }
 

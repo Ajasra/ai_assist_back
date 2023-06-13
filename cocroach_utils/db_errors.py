@@ -1,7 +1,7 @@
 import time
 import pandas as pd
 
-from cocroach_utils.database_utils import conn
+from cocroach_utils.database_utils import connect_to_db
 
 
 def save_error(error, metadata=None):
@@ -12,6 +12,9 @@ def save_error(error, metadata=None):
     :return:
     """
     print(str(error))
+
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -31,6 +34,8 @@ def get_errors():
     Get all errors from the database
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -51,6 +56,8 @@ def get_errors_by_time(start_time, end_time):
     Get all errors from the database
     :return:
     """
+    conn = connect_to_db()
+
     if conn is not None:
         try:
             with conn.cursor() as cur:

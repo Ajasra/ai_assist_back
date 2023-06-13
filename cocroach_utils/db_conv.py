@@ -1,6 +1,8 @@
-from cocroach_utils.database_utils import conn
+
+
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_history import delete_history_by_conv_id
+from cocroach_utils.database_utils import connect_to_db
 
 
 def get_user_conversations(user_id):
@@ -9,6 +11,7 @@ def get_user_conversations(user_id):
     :param user_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -39,6 +42,7 @@ def get_conv_by_id(conversation_id):
     :param conversation_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -69,6 +73,7 @@ def add_conversation(user_id, doc_id, title="New conversation"):
     :param title:
     :return: conv_id
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -93,6 +98,7 @@ def update_conversation(conversation_id, title):
     :param title:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -116,6 +122,7 @@ def delete_conversation(conversation_id):
     :param conversation_id:
     :return:
     """
+    conn = connect_to_db()
     if conn is not None:
         try:
             delete_history_by_conv_id(conversation_id)
@@ -142,9 +149,10 @@ def delete_conversation_by_user(user_id):
     """
     # get all conversations for the user
     conversations = get_user_conversations(user_id)
-    for conv in conversations:
-        delete_history_by_conv_id(conv[0])
+    # for conv in conversations:
+    #     delete_history_by_conv_id(conv[0])
 
+    conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
