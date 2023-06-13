@@ -1,3 +1,4 @@
+import shutil
 import time
 import pandas as pd
 
@@ -217,6 +218,8 @@ def delete_doc_by_id(doc_id):
     :return:
     """
     conn = connect_to_db()
+
+    print("delete_doc_by_id", doc_id    )
     if conn is not None:
         try:
             with conn.cursor() as cur:
@@ -224,6 +227,8 @@ def delete_doc_by_id(doc_id):
                     "DELETE FROM documents WHERE doc_id = %s",
                     (doc_id,))
                 conn.commit()
+                # delete folder and all files in it from the server './db/doc_id'
+                shutil.rmtree('./db/' + str(doc_id))
                 return True
         except Exception as err:
             conn.rollback()

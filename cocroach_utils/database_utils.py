@@ -13,6 +13,7 @@ def connect_to_db():
     :return:
     """
     global conn
+    print(conn)
     if conn is None:
         try:
             conn = psycopg2.connect(database_url)

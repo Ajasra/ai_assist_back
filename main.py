@@ -9,7 +9,7 @@ from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id,
 from cocroach_utils.db_history import get_history_for_conv
 from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation, \
     add_conversation
-from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs
+from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
 from conversation.requests_conv import get_file_summary
 from vectordb.vectordb import create_vector_index
 from conversation.conv import get_response_over_doc, get_simple_response
@@ -30,8 +30,8 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    # allow_origins=["*"],
+    # allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +70,10 @@ class DocRequest(BaseModel):
     file: UploadFile = File(...)
     user_id: int = Form(...)
     force: bool = Form(...)
+
+
+class Document(BaseModel):
+    doc_id: int = None
 
 
 @app.get("/")
@@ -240,6 +244,30 @@ async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(.
     except Exception as e:
         return {
             "result": str(e),
+            "code": 400,
+        }
+
+
+@app.post("/docs/delete")
+async def delete_doc(body: Document):
+    print(body.doc_id)
+
+    if body.doc_id is not None:
+        try:
+            res = delete_doc_by_id(body.doc_id)
+
+            return {
+                "result": res,
+                "code": 200,
+            }
+        except Exception as e:
+            return {
+                "result": str(e),
+                "code": 400,
+            }
+    else:
+        return {
+            "result": "doc_id is required",
             "code": 400,
         }
 
