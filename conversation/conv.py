@@ -1,8 +1,9 @@
 import os
 
+import openai
 import tiktoken
 from dotenv import load_dotenv
-from langchain import LLMChain, PromptTemplate
+from langchain import LLMChain, PromptTemplate, ConversationChain
 
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -19,9 +20,11 @@ from langchain.chains.router import MultiRetrievalQAChain
 
 from vectordb.vectordb import get_embedding_model
 
+from cocroach_utils.db_docs import get_doc_by_id
+
 load_dotenv()
 
-llm = ChatOpenAI(temperature=.0, model_name="gpt-3.5-turbo", verbose=True)
+llm = ChatOpenAI(temperature=.0, model_name="gpt-3.5-turbo", verbose=True, model_kwargs={"stream": False})
 
 persist_directory = './db'
 
@@ -123,7 +126,8 @@ def num_tokens_from_messages(message, model="gpt-3.5-turbo"):
         tokens_per_message = 3
         tokens_per_name = 1
     else:
-        raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
+        raise NotImplementedError(
+            f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
     num_tokens = len(encoding.encode(message))
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
@@ -183,6 +187,8 @@ def get_simple_response(prompt, conv_id, user_id, memory):
 def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
     if doc_id is not None:
 
+        user_prompt = prompt
+
         index_dir = os.path.join(persist_directory, str(doc_id))
         embeddings = get_embedding_model()
         docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
@@ -221,13 +227,12 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
 
         # _DEFAULT_TEMPLATE = prompt
 
-        retriever = docsearch.as_retriever(enable_limit=True, search_kwargs={"k": 3})
-
-
+        # retriever = docsearch.as_retriever(enable_limit=True, search_kwargs={"k": 6})
+        retriever = docsearch.as_retriever()
 
         memory_obj = ConversationBufferMemory(
-                    memory_key="history",
-                    input_key="question")
+            memory_key="history",
+            input_key="question")
 
         if memory != -1:
             # get history from db
@@ -236,25 +241,68 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 # from last to first
                 history.reverse()
                 for hist in history:
-                    print(hist["prompt"])
                     memory_obj.save_context(
                         {"question": hist["prompt"]},
                         {"output": hist["answer"]}
                     )
 
-            # print(memory_obj.load_memory_variables({}))
 
-        sources = retriever.get_relevant_documents(prompt)
-
-        if len(sources) == 0:
-
-            # TODO: Rewrite the prompt with the API (give summary of the document and the name of the document)
-
-            return {
-                "status": "error",
-                "message": "No relevant documents found, please clarify the question",
-                "conversation_id": str(cur_conv)
-            }
+        # sources = retriever.get_relevant_documents(prompt)
+        #
+        # if len(sources) == 0:
+        #     # TODO: Rewrite the prompt with the API (give summary of the document and the name of the document)
+        #     doc = get_doc_by_id(doc_id)
+        #     title = doc["name"]
+        #     summary = doc["summary"]
+        #
+        #     # join all history
+        #     hist = ""
+        #     for h in history:
+        #         hist += "question: " + h["prompt"] + "\n"
+        #         hist += "answer: " + h["answer"] + "\n"
+        #
+        #     tmp = "Give a revised and optimized prompt based on the original prompt, document summary, document " \
+        #                "name and history of the conversation." \
+        #                "The prompt should be related to the document." \
+        #                "Answer only the optimized prompt. Don't try to make up an answer." \
+        #                "<document summary>"+summary+"</document summary>" \
+        #                "<document name>"+title+"</document name>" \
+        #                 "<history>" + hist + "</history>," \
+        #                 "<original prompt>"+user_prompt+"</original prompt>"
+        #
+        #     system = PromptTemplate(
+        #         template="",
+        #         input_variables=[],
+        #     )
+        #     system_message_prompt = SystemMessagePromptTemplate(prompt=system)
+        #     human_template = "{text}"
+        #     human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+        #
+        #     chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
+        #     chain = LLMChain(llm=llm, prompt=chat_prompt)
+        #
+        #     try:
+        #         response = chain.run(text=tmp)
+        #         response = response.replace("Optimized prompt: ", "")
+        #
+        #         return {
+        #             "status": "success",
+        #             "message": "Agent response",
+        #             "data": {
+        #                 "response": "Sorry, I cant answer your question. Please clarify.",
+        #                 "follow_up_questions": [response],
+        #                 "source": [],
+        #                 "conversation_id": str(cur_conv)
+        #             }
+        #         }
+        #
+        #     except Exception as e:
+        #         save_error(e)
+        #         return {
+        #             "status": "error",
+        #             "message": str(e),
+        #             "conversation_id": cur_conv
+        #         }
 
         cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
@@ -269,8 +317,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
         )
 
         try:
-            result = cur_conversation({"query": prompt})
-            print(result)
+            result = cur_conversation({"query": user_prompt})
             response = format_response(result['result'])
             add_history(cur_conv, prompt, response["answer"])
 
@@ -314,8 +361,10 @@ def multichain():
     print("Multichain")
 
     embeddings = OpenAIEmbeddings()
-    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever(search_kwargs={"k": 3})
-    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever(search_kwargs={"k": 3})
+    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever(
+        search_kwargs={"k": 3})
+    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever(
+        search_kwargs={"k": 3})
 
     retriever_infos = [
         {
@@ -360,7 +409,8 @@ def get_summary_response(prompt):
     embeddings = OpenAIEmbeddings()
     docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
     cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(llm=llm, chain_type="stuff",
-                                                                  retriever=docsearch.as_retriever(search_kwargs={"k": 3}))
+                                                                   retriever=docsearch.as_retriever(
+                                                                       search_kwargs={"k": 3}))
 
     _DEFAULT_TEMPLATE = """Given the context information answer the following question
                                 If you don't know the answer, just say you dont know Don't try to make up an answer.
