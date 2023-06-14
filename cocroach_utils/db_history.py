@@ -29,7 +29,8 @@ def get_history_for_conv(conversation_id, limit=10):
                         "prompt": doc[2],
                         "answer": doc[3],
                         "time": doc[4],
-                        "feedback": doc[5]
+                        "feedback": doc[5],
+                        "followup": doc[6]
                     })
                 return docs
         except Exception as err:
@@ -61,7 +62,8 @@ def get_selected_history(history_id):
                     "prompt": doc[2],
                     "answer": doc[3],
                     "time": doc[4],
-                    "feedback": doc[5]
+                    "feedback": doc[5],
+                    "followup": doc[6]
                 }
         except Exception as err:
             conn.rollback()
@@ -72,23 +74,28 @@ def get_selected_history(history_id):
         return []
 
 
-def add_history(conv_id, prompt, answer, feedback=0):
+def add_history(conv_id, prompt, answer, followup=None, feedback=0):
     """
     Add history to the database and return the new history_id
+    :param followup:
     :param conv_id:
     :param prompt:
     :param answer:
     :param feedback:
     :return: history_id
     """
+
+    if followup is None:
+        followup = ''
+
     conn = connect_to_db()
     if conn is not None:
         try:
             with conn.cursor() as cur:
                 cur_time = pd.Timestamp(time.time(), unit='s')
                 cur.execute(
-                    "INSERT INTO history (conv_id, prompt, answer, feedback, time) VALUES (%s, %s, %s, %s, %s) RETURNING hist_id",
-                    (conv_id, prompt, answer, feedback, cur_time))
+                    "INSERT INTO history (conv_id, prompt, answer, feedback, time, followup) VALUES (%s, %s, %s, %s, %s, %s) RETURNING hist_id",
+                    (conv_id, prompt, answer, feedback, cur_time, followup))
                 conn.commit()
                 return cur.fetchone()[0]
         except Exception as err:

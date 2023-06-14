@@ -1,147 +1,98 @@
 import os
 
-import openai
-import tiktoken
 from dotenv import load_dotenv
-from langchain import LLMChain, PromptTemplate, ConversationChain
+from langchain import LLMChain, PromptTemplate
+from langchain.chains.summarize import load_summarize_chain
 
 from langchain.chat_models import ChatOpenAI
-from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
-from langchain.vectorstores import Chroma, DocArrayInMemorySearch
-from langchain.chains import RetrievalQAWithSourcesChain, RetrievalQA
-
+from langchain.text_splitter import TokenTextSplitter
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
 
 from cocroach_utils.db_errors import save_error
-from cocroach_utils.db_conv import add_conversation, get_conv_by_id
 from cocroach_utils.db_history import add_history, get_history_for_conv
-from langchain.chains.router import MultiRetrievalQAChain
+from cocroach_utils.db_docs import update_doc_summary_by_id, update_doc_steps_by_id, get_doc_by_id
+from conversation.conv_helper import get_conv_id, format_response, moderation
 
 from vectordb.vectordb import get_embedding_model
-
-from cocroach_utils.db_docs import get_doc_by_id
+from vectordb.vectordb import get_loader
 
 load_dotenv()
-
-llm = ChatOpenAI(temperature=.0, model_name="gpt-3.5-turbo", verbose=True, model_kwargs={"stream": False})
-
+model_name = ["gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k"]
 persist_directory = './db'
 
-conversations = []
-memories = []
+llm = ChatOpenAI(temperature=.0, model_name=model_name[0], verbose=True, model_kwargs={"stream": False})
 
 
-def format_response(response_input):
-    """
-    Format the response
-    :param response_input:
-    :return:
-    """
-    print("Response input: ", response_input)
-    data = []
-    # check if there are follow up questions regardless of uppercase or lowercase
-    if "FOLLOW UP QUESTIONS:" in response_input:
-        data = response_input.split("FOLLOW UP QUESTIONS:")
-    elif "FOLLOWUP QUESTIONS:" in response_input:
-        data = response_input.split("FOLLOWUP QUESTIONS:")
-    elif "Follow up questions:" in response_input:
-        data = response_input.split("Follow up questions:")
-    elif "Followup questions:" in response_input:
-        data = response_input.split("Followup questions:")
-    elif "follow up questions:" in response_input:
-        data = response_input.split("follow up questions:")
-    elif "followup questions:" in response_input:
-        data = response_input.split("followup questions:")
-    elif "Followup" in response_input:
-        data = response_input.split("Followup:")
-    elif "FOLLOWUP" in response_input:
-        data = response_input.split("FOLLOWUP:")
-    elif "followup" in response_input:
-        data = response_input.split("followup:")
-    elif "follow-up" in response_input:
-        data = response_input.split("follow-up:")
-
-    if len(data) > 1:
-        answer = data[0].strip().replace("ANSWER:", "")
-        answer = data[0].strip().replace("answer:", "")
-        answer = data[0].strip().replace("Answer:", "")
-        follow_up_questions = data[1].strip().split("\n")
-        if len(follow_up_questions) == 1:
-            follow_up_questions = data[1].strip().split("?")
+def get_doc_summary(file, doc_id, chunk_size=2048, chunk_overlap=64):
+    if file.filename == '':
         return {
-            "answer": answer,
-            "follow_up_questions": follow_up_questions
+            "status": "error",
+            "message": "No file selected"
         }
-    else:
-        return {
-            "answer": response_input.replace("ANSWER:", "").strip(),
-            "follow_up_questions": [],
-            "source": ""
-        }
+    filename = f"./data/{file.filename}"
+    loader = get_loader(filename)
+    documents = loader.load()
+    text_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+                                      encoding_name="cl100k_base")
+    docs = text_splitter.split_documents(documents)
 
+    prompt_template = """Write a concise and condensed summary of the following:
 
-def get_conv_id(conv_id, user_id, doc_id):
-    """
-    Get the conversation id and return a new one if it does not exist
-    :param conv_id:
-    :param user_id:
-    :param doc_id:
-    :return:
-    """
-    cur_conv = None
-    if conv_id is None or conv_id == -1 or conv_id == 0:
-        # cur_conv = add_conversation(user_id, doc_id, title="New conversation")
-        # print("New conversation added"
-        #       "Conversation id: ", cur_conv)
-        pass
-    else:
-        conv = get_conv_by_id(conv_id)
-        if conv is None:
-            save_error("Conversation not found")
-            cur_conv = -1
-        else:
-            cur_conv = conv_id
+    {text}
 
-    return cur_conv
+    CONCISE SUMMARY:"""
 
+    prompttemplate = PromptTemplate(template=prompt_template, input_variables=["text"])
+    chain = load_summarize_chain(llm, chain_type="map_reduce", return_intermediate_steps=True,
+                                 map_prompt=prompttemplate, combine_prompt=prompttemplate)
 
-def num_tokens_from_messages(message, model="gpt-3.5-turbo"):
-    """Returns the number of tokens used by a list of messages."""
     try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        print("Warning: model not found. Using cl100k_base encoding.")
-        encoding = tiktoken.get_encoding("cl100k_base")
-    if model == "gpt-3.5-turbo":
-        print("Warning: gpt-3.5-turbo may change over time. Returning num tokens assuming gpt-3.5-turbo-0301.")
-        return num_tokens_from_messages(message, model="gpt-3.5-turbo-0301")
-    elif model == "gpt-4":
-        print("Warning: gpt-4 may change over time. Returning num tokens assuming gpt-4-0314.")
-        return num_tokens_from_messages(message, model="gpt-4-0314")
-    elif model == "gpt-3.5-turbo-0301":
-        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
-        tokens_per_name = -1  # if there's a name, the role is omitted
-    elif model == "gpt-4-0314":
-        tokens_per_message = 3
-        tokens_per_name = 1
-    else:
-        raise NotImplementedError(
-            f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
-    num_tokens = len(encoding.encode(message))
-    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
-    return num_tokens
+        summary = chain({"input_documents": docs}, return_only_outputs=True)
+        intermediate_steps = summary['intermediate_steps']
+        intermediate_steps = "\n".join(intermediate_steps)
+        result = summary['output_text']
+        update_doc_summary_by_id(doc_id, result)
+        try:
+            update_doc_steps_by_id(doc_id, intermediate_steps)
+        except Exception as e:
+            print("Error in updating steps: ", e)
+
+        return {
+            "status": "success",
+            "message": "File summary",
+            "data": {
+                "summary": result,
+                "steps": intermediate_steps
+            }
+        }
+
+    except Exception as e:
+        save_error(e)
+        return {
+            "status": "error",
+            "message": "Error in getting summary",
+        }
 
 
-def get_simple_response(prompt, conv_id, user_id, memory):
+def get_simple_response(prompt, conv_id, user_id, history):
     """
     Get a simple response from the model
+    :param history:
     :param user_id:
     :param prompt:
     :param conv_id:
-    :param memory:
     :return:
     """
+
+    # if moderation(prompt):
+    #     return {
+    #         "status": "error",
+    #         "message": "Please be polite",
+    #         "conversation_id": conv_id
+    #     }
 
     cur_conv = get_conv_id(conv_id, user_id, 0)
     if cur_conv == -1:
@@ -187,7 +138,15 @@ def get_simple_response(prompt, conv_id, user_id, memory):
 def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
     if doc_id is not None:
 
+        # if moderation(prompt):
+        #     return {
+        #         "status": "error",
+        #         "message": "Please be polite",
+        #         "conversation_id": conv_id
+        #     }
+
         user_prompt = prompt
+        history = []
 
         index_dir = os.path.join(persist_directory, str(doc_id))
         embeddings = get_embedding_model()
@@ -202,11 +161,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
             }
 
         _DEFAULT_TEMPLATE = """Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
-                            If you don't know the answer, just say you dont know Don't try to make up an answer.
-                            =========
-                            Always answer in the json format with the following fields:
-                            "answer": "<your answer>",
-                            "followup": "<list of 3 suggested questions related to context and conversation for better understanding>"
+                            If you don't know the answer, reply "NONE".
                             =========
                             ------
                             <ctx>
@@ -218,16 +173,13 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                             </hs>
                             ------
                             {question}
-                            Answer:"""
+                            Answer: """
 
         promptTmp = PromptTemplate(
             input_variables=["history", "context", "question"],
             template=_DEFAULT_TEMPLATE,
         )
 
-        # _DEFAULT_TEMPLATE = prompt
-
-        # retriever = docsearch.as_retriever(enable_limit=True, search_kwargs={"k": 6})
         retriever = docsearch.as_retriever()
 
         memory_obj = ConversationBufferMemory(
@@ -246,64 +198,6 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                         {"output": hist["answer"]}
                     )
 
-
-        # sources = retriever.get_relevant_documents(prompt)
-        #
-        # if len(sources) == 0:
-        #     # TODO: Rewrite the prompt with the API (give summary of the document and the name of the document)
-        #     doc = get_doc_by_id(doc_id)
-        #     title = doc["name"]
-        #     summary = doc["summary"]
-        #
-        #     # join all history
-        #     hist = ""
-        #     for h in history:
-        #         hist += "question: " + h["prompt"] + "\n"
-        #         hist += "answer: " + h["answer"] + "\n"
-        #
-        #     tmp = "Give a revised and optimized prompt based on the original prompt, document summary, document " \
-        #                "name and history of the conversation." \
-        #                "The prompt should be related to the document." \
-        #                "Answer only the optimized prompt. Don't try to make up an answer." \
-        #                "<document summary>"+summary+"</document summary>" \
-        #                "<document name>"+title+"</document name>" \
-        #                 "<history>" + hist + "</history>," \
-        #                 "<original prompt>"+user_prompt+"</original prompt>"
-        #
-        #     system = PromptTemplate(
-        #         template="",
-        #         input_variables=[],
-        #     )
-        #     system_message_prompt = SystemMessagePromptTemplate(prompt=system)
-        #     human_template = "{text}"
-        #     human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
-        #
-        #     chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
-        #     chain = LLMChain(llm=llm, prompt=chat_prompt)
-        #
-        #     try:
-        #         response = chain.run(text=tmp)
-        #         response = response.replace("Optimized prompt: ", "")
-        #
-        #         return {
-        #             "status": "success",
-        #             "message": "Agent response",
-        #             "data": {
-        #                 "response": "Sorry, I cant answer your question. Please clarify.",
-        #                 "follow_up_questions": [response],
-        #                 "source": [],
-        #                 "conversation_id": str(cur_conv)
-        #             }
-        #         }
-        #
-        #     except Exception as e:
-        #         save_error(e)
-        #         return {
-        #             "status": "error",
-        #             "message": str(e),
-        #             "conversation_id": cur_conv
-        #         }
-
         cur_conversation = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -319,7 +213,30 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
         try:
             result = cur_conversation({"query": user_prompt})
             response = format_response(result['result'])
-            add_history(cur_conv, prompt, response["answer"])
+            print("response: ", response)
+
+            if response["answer"] == "NONE":
+                user_prompt = get_prompt_suggestion_doc(user_prompt, doc_id, history)
+                print("user_prompt: ", user_prompt)
+                result = cur_conversation({"query": user_prompt})
+                response = format_response(result['result'])
+                print("response: ", response)
+
+                if response["answer"] == "NONE":
+                    result = get_simple_response(user_prompt, cur_conv, user_id, history)
+                    print("result: ", result)
+                    if result["status"] == "success":
+                        response["answer"] = result["message"]
+                    else:
+                        return {
+                            "status": "error",
+                            "message": "Error while getting response",
+                            "conversation_id": str(cur_conv),
+                            "data": {
+                                "response": "Error while getting response",
+                            }
+                        }
+
 
         except Exception as e:
             save_error(e)
@@ -332,12 +249,26 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 }
             }
 
+        history.append({
+            "prompt": prompt,
+            "answer": response["answer"]
+        })
+
+        follow_up = get_follow_up_questions_doc(doc_id, history)
+
+        follow_up_str = "\n".join(follow_up)
+        add_history(cur_conv, prompt, response["answer"], follow_up_str)
+
+        source = []
+        if result["source_documents"] is not None:
+            source = result["source_documents"]
+
         return {
             "status": "success",
             "message": "Agent response",
             "data": {
                 "response": response["answer"],
-                "follow_up_questions": response["follow_up_questions"],
+                "follow_up_questions": follow_up,
                 "source": result["source_documents"],
                 "conversation_id": str(cur_conv)
             }
@@ -352,77 +283,165 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
         }
 
 
+def get_follow_up_questions_doc(doc_id, history):
+
+    if doc_id is not None:
+        doc = get_doc_by_id(doc_id)
+
+        hist = ""
+        if history is None:
+            history = []
+        history = history[-3:]
+        for h in history:
+            hist += "question: " + h["prompt"] + "\n"
+            hist += "answer: " + h["answer"] + "\n"
+
+        tmp = "Suggest 3 follow up questions based on the  document summary, document name " \
+            "and history of the conversation." \
+            "Give more attention to the last question and answer in the history." \
+            "Answer only the follow up questions. Don't try to make up an answer. Separate them with new line" \
+            "<document summary>" + doc['summary'] + "</document summary>" \
+            "<document name>" + doc['name'] + "</document name>" \
+            "<history>" + hist + "</history>," \
+            "Follow up questions: "
+
+        system = PromptTemplate(
+            template="",
+            input_variables=[],
+        )
+        system_message_prompt = SystemMessagePromptTemplate(prompt=system)
+        human_template = "{text}"
+        human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+
+        chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
+        chain = LLMChain(llm=llm, prompt=chat_prompt)
+
+        try:
+            response = chain.run(text=tmp)
+            response = response.replace("Follow up questions: ", "")
+            response = response.split("\n")
+            return response
+
+        except Exception as e:
+            save_error(e)
+            return []
+
+
+def get_prompt_suggestion_doc(prompt, doc_id, history):
+    # TODO: Rewrite the prompt with the API (give summary of the document and the name of the document)
+    doc = get_doc_by_id(doc_id)
+    title = doc["name"]
+    summary = doc["summary"]
+
+    hist = ""
+    if history is None:
+        history = []
+    for h in history:
+        hist += "question: " + h["prompt"] + "\n"
+        hist += "answer: " + h["answer"] + "\n"
+
+    tmp = "Give a revised and optimized prompt based on the original prompt, document summary, document " \
+          "name and history of the conversation." \
+          "The prompt should be related to the document and to original prompt." \
+          "Answer only the optimized prompt. Don't try to make up an answer." \
+          "<document summary>" + summary + "</document summary>" \
+          "<document name>" + title + "</document name>" \
+          "<history>" + hist + "</history>," \
+          "<original prompt>" + prompt + "</original prompt>"\
+          "Optimized prompt: "
+
+    system = PromptTemplate(
+        template="",
+        input_variables=[],
+    )
+    system_message_prompt = SystemMessagePromptTemplate(prompt=system)
+    human_template = "{text}"
+    human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+
+    chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
+    chain = LLMChain(llm=llm, prompt=chat_prompt)
+
+    try:
+        response = chain.run(text=tmp)
+        response = response.replace("Optimized prompt: ", "")
+        return response
+
+    except Exception as e:
+        save_error(e)
+        return prompt
+
+
 # TESTING AND EXPERIMENTS
-def multichain():
-    """
-    Test multichain query
-    :return:
-    """
-    print("Multichain")
+# def multichain():
+#     """
+#     Test multichain query
+#     :return:
+#     """
+#     print("Multichain")
+#
+#     embeddings = OpenAIEmbeddings()
+#     docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever(
+#         search_kwargs={"k": 3})
+#     docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever(
+#         search_kwargs={"k": 3})
+#
+#     retriever_infos = [
+#         {
+#             "name": "Cancer Culture",
+#             "description": "Good for answering questions about the Cancer culture book",
+#             "retriever": docsearch1
+#         },
+#         {
+#             "name": "History and condition for creativity",
+#             "description": "Good for answer questions about Creativity",
+#             "retriever": docsearch2
+#         }
+#     ]
+#
+#     chain = MultiRetrievalQAChain.from_retrievers(llm, retriever_infos, verbose=True)
+#
+#     prompt = "What is the book cancer culture about?"
+#
+#     _DEFAULT_TEMPLATE = """Given the context information answer the following question
+#                                 If you don't know the answer, just say you dont know Don't try to make up an answer.
+#                                 =========
+#                                 Always answer in the format:
+#                                 ANSWER: <your answer>
+#                                 FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
+#                                 SOURCE: <do not make up source, give the page or the chapter from the document>
+#                                 =========
+#                                 question: {}""".format(prompt)
+#
+#     response = chain.run(prompt)
+#     print(response)
 
-    embeddings = OpenAIEmbeddings()
-    docsearch1 = Chroma(persist_directory="./db/866136357063950337", embedding_function=embeddings).as_retriever(
-        search_kwargs={"k": 3})
-    docsearch2 = Chroma(persist_directory="./db/866149744008953857", embedding_function=embeddings).as_retriever(
-        search_kwargs={"k": 3})
 
-    retriever_infos = [
-        {
-            "name": "Cancer Culture",
-            "description": "Good for answering questions about the Cancer culture book",
-            "retriever": docsearch1
-        },
-        {
-            "name": "History and condition for creativity",
-            "description": "Good for answer questions about Creativity",
-            "retriever": docsearch2
-        }
-    ]
-
-    chain = MultiRetrievalQAChain.from_retrievers(llm, retriever_infos, verbose=True)
-
-    prompt = "What is the book cancer culture about?"
-
-    _DEFAULT_TEMPLATE = """Given the context information answer the following question
-                                If you don't know the answer, just say you dont know Don't try to make up an answer.
-                                =========
-                                Always answer in the format:
-                                ANSWER: <your answer>
-                                FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
-                                SOURCE: <do not make up source, give the page or the chapter from the document>
-                                =========
-                                question: {}""".format(prompt)
-
-    response = chain.run(prompt)
-    print(response)
-
-
-def get_summary_response(prompt):
-    """
-    Get response over the multiple index test
-    :param prompt:
-    :return:
-    """
-    print("\n")
-    print(prompt)
-    index_dir = os.path.join(persist_directory, "summary")
-    embeddings = OpenAIEmbeddings()
-    docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
-    cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(llm=llm, chain_type="stuff",
-                                                                   retriever=docsearch.as_retriever(
-                                                                       search_kwargs={"k": 3}))
-
-    _DEFAULT_TEMPLATE = """Given the context information answer the following question
-                                If you don't know the answer, just say you dont know Don't try to make up an answer.
-                                =========
-                                Always answer in the format:
-                                ANSWER: <your answer>
-                                FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
-                                SOURCE: <do not make up source, give the page or the chapter from the document>
-                                =========
-                                question: {}""".format(prompt)
-
-    result = cur_conversation({"question": _DEFAULT_TEMPLATE})
-    response = format_response(result["answer"])
-    print(response)
-    return response
+# def get_summary_response(prompt):
+#     """
+#     Get response over the multiple index test
+#     :param prompt:
+#     :return:
+#     """
+#     print("\n")
+#     print(prompt)
+#     index_dir = os.path.join(persist_directory, "summary")
+#     embeddings = OpenAIEmbeddings()
+#     docsearch = Chroma(persist_directory=index_dir, embedding_function=embeddings)
+#     cur_conversation = RetrievalQAWithSourcesChain.from_chain_type(llm=llm, chain_type="stuff",
+#                                                                    retriever=docsearch.as_retriever(
+#                                                                        search_kwargs={"k": 3}))
+#
+#     _DEFAULT_TEMPLATE = """Given the context information answer the following question
+#                                 If you don't know the answer, just say you dont know Don't try to make up an answer.
+#                                 =========
+#                                 Always answer in the format:
+#                                 ANSWER: <your answer>
+#                                 FOLLOW UP QUESTIONS: <list of 3 suggested questions related to context and conversation for better understanding>
+#                                 SOURCE: <do not make up source, give the page or the chapter from the document>
+#                                 =========
+#                                 question: {}""".format(prompt)
+#
+#     result = cur_conversation({"question": _DEFAULT_TEMPLATE})
+#     response = format_response(result["answer"])
+#     print(response)
+#     return response

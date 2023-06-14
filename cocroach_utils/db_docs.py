@@ -173,7 +173,32 @@ def update_doc_summary_by_id(doc_id, doc_text):
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE documents SET summary = %s, updated = %s WHERE doc_id = %s",
-                    (doc_text, pd.Timestamp(time.time(), unit='s'), doc_id))
+                    (doc_text, pd.Timestamp(time.time(), unit='s'),  doc_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
+def update_doc_steps_by_id(doc_id, steps):
+    """
+    Update doc summary
+    :param doc_id:
+    :param doc_text:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE documents SET updated = %s, summary_steps = %s WHERE doc_id = %s",
+                    ( pd.Timestamp(time.time(), unit='s'), steps, doc_id))
                 conn.commit()
                 return True
         except Exception as err:

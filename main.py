@@ -10,9 +10,8 @@ from cocroach_utils.db_history import get_history_for_conv
 from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation, \
     add_conversation
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
-from conversation.requests_conv import get_file_summary
 from vectordb.vectordb import create_vector_index
-from conversation.conv import get_response_over_doc, get_simple_response
+from conversation.conv import get_response_over_doc, get_simple_response, get_doc_summary
 
 app = FastAPI()
 debug = True
@@ -226,9 +225,8 @@ async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(.
         print('Uploading')
 
         if res['status'] == 'success':
-            summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
-            if summary['status'] == 'success':
-                update_doc_summary_by_id(res['data']['doc_id'], summary['data']['summary'])
+            # summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
+            summary = get_doc_summary(file, str(res['data']['doc_id']))
 
             return {
                 "result": res,
