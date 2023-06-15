@@ -6,7 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
-from cocroach_utils.db_history import get_history_for_conv
+from cocroach_utils.db_history import get_history_for_conv, update_history_feedback_by_id
 from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation, \
     add_conversation
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
@@ -75,6 +75,11 @@ class Document(BaseModel):
     doc_id: int = None
 
 
+class History(BaseModel):
+    hist_id: int = None
+    feedback: int = 0
+
+
 @app.get("/")
 def read_root():
     return {"Page not found"}
@@ -139,7 +144,6 @@ async def get_history(body: Conversation):
 
 @app.post("/conv/create")
 async def create_conv(body: Conversation):
-
     if body.user_id is None:
         return {
             "response": "User ID is required",
@@ -166,9 +170,27 @@ async def create_conv(body: Conversation):
         "code": 200,
     }
 
+
+@app.post("/conv/history/feedback")
+async def history_feedback(body: History):
+
+    if body.hist_id is None:
+        return {
+            "response": "History ID is required",
+            "code": 400,
+        }
+
+    result = update_history_feedback_by_id(body.hist_id, body.feedback)
+
+    return {
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
+
+
 @app.post("/conv/update")
 async def update_conv(body: Conversation):
-
     if body.title is None:
         return {
             "response": "Title is required",
@@ -185,7 +207,6 @@ async def update_conv(body: Conversation):
 
 @app.post("/conv/delete")
 async def delete_conv(body: Conversation):
-
     print(body.conv_id)
     result = delete_conversation(body.conv_id)
 
@@ -219,7 +240,6 @@ async def get_indexes(body: User):
 
 @app.post("/docs/uploadfile/")
 async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
-
     try:
         res = create_vector_index(file, user_id, force)
         print('Uploading')

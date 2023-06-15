@@ -24,8 +24,8 @@ def get_history_for_conv(conversation_id, limit=10):
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
-                        "hist_id": doc[0],
-                        "conv_id": doc[1],
+                        "hist_id": str(doc[0]),
+                        "conv_id": str(doc[1]),
                         "prompt": doc[2],
                         "answer": doc[3],
                         "time": doc[4],
@@ -57,8 +57,8 @@ def get_selected_history(history_id):
                     (history_id,))
                 doc = cur.fetchone()
                 return {
-                    "hist_id": doc[0],
-                    "conv_id": doc[1],
+                    "hist_id": str(doc[0]),
+                    "conv_id": str(doc[1]),
                     "prompt": doc[2],
                     "answer": doc[3],
                     "time": doc[4],
@@ -106,6 +106,54 @@ def add_history(conv_id, prompt, answer, followup=None, feedback=0):
         save_error("No connection to the database")
         return -1
 
+
+def update_history_feedback_by_id(history_id, feedback = 1):
+    """
+    Update feedback for the history
+    :param history_id:
+    :param feedback:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE history SET feedback = %s WHERE hist_id = %s",
+                    (feedback, history_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+def update_sorces_hist_by_id(history_id, sources):
+    """
+    Update sources for the history
+    :param history_id:
+    :param sources:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE history SET sources = %s WHERE hist_id = %s",
+                    (sources, history_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
 
 def delete_history_by_id(history_id):
     """

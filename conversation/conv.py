@@ -12,6 +12,7 @@ from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
 
 from cocroach_utils.db_errors import save_error
+from cocroach_utils.db_helper import DocumentsToStr
 from cocroach_utils.db_history import add_history, get_history_for_conv
 from cocroach_utils.db_docs import update_doc_summary_by_id, update_doc_steps_by_id, get_doc_by_id
 from conversation.conv_helper import get_conv_id, format_response, moderation
@@ -162,6 +163,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
 
         _DEFAULT_TEMPLATE = """Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
                             If you don't know the answer, reply "NONE".
+                            Always reply in the Markdown format.
                             =========
                             ------
                             <ctx>
@@ -257,7 +259,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
         follow_up = get_follow_up_questions_doc(doc_id, history)
 
         follow_up_str = "\n".join(follow_up)
-        add_history(cur_conv, prompt, response["answer"], follow_up_str)
+        hist_id = add_history(cur_conv, prompt, response["answer"], follow_up_str)
 
         source = []
         if result["source_documents"] is not None:
@@ -269,8 +271,9 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
             "data": {
                 "response": response["answer"],
                 "follow_up_questions": follow_up,
-                "source": result["source_documents"],
-                "conversation_id": str(cur_conv)
+                "source": DocumentsToStr(result["source_documents"]),
+                "conversation_id": str(cur_conv),
+                "history_id": hist_id
             }
         }
 
