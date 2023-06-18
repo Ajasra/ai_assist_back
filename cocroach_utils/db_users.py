@@ -27,6 +27,7 @@ def get_user_by_id(user_id):
                     "name": doc[1],
                     "email": doc[2],
                     "active": doc[4],
+                    "role": doc[5],
                 }
         except Exception as err:
             conn.rollback()

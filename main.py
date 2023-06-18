@@ -1,5 +1,6 @@
 import hashlib
 import os.path
+from dotenv import load_dotenv
 
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form
@@ -7,12 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv, update_history_feedback_by_id
-from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation, delete_conversation, \
-    add_conversation
+from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation_title, delete_conversation, \
+    add_conversation, update_conversation_active, update_conversation_summary
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
 from vectordb.vectordb import create_vector_index
 from conversation.conv import get_response_over_doc, get_simple_response, get_doc_summary
 
+
+load_dotenv()
 app = FastAPI()
 debug = True
 
@@ -46,6 +49,7 @@ class ConvRequest(BaseModel):
     user_id: int = None
     document: int = None
     memory: int = 10
+    api_key: str = None
 
 
 class User(BaseModel):
@@ -55,6 +59,7 @@ class User(BaseModel):
     password: str = None
     old_password: str = None
     hash_password: str = None
+    api_key: str = None
 
 
 class Conversation(BaseModel):
@@ -63,6 +68,9 @@ class Conversation(BaseModel):
     title: str = None
     user_id: int = None
     doc_id: int = None
+    active: bool = None
+    summary: str = None
+    api_key: str = None
 
 
 class DocRequest(BaseModel):
@@ -73,11 +81,22 @@ class DocRequest(BaseModel):
 
 class Document(BaseModel):
     doc_id: int = None
+    api_key: str = None
 
 
 class History(BaseModel):
     hist_id: int = None
     feedback: int = 0
+    api_key: str = None
+
+
+
+def check_api_key(api_key):
+    if api_key is None:
+        return False
+    if api_key == os.getenv("PUBLIC_API_KEY"):
+        return True
+    return False
 
 
 @app.get("/")
@@ -88,6 +107,13 @@ def read_root():
 # CONVERSATIONS
 @app.post("/conv/get_response")
 async def get_response(body: ConvRequest):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     resp = get_simple_response(body.user_message, body.conversation_id, body.user_id, body.memory)
 
     return {
@@ -99,6 +125,13 @@ async def get_response(body: ConvRequest):
 
 @app.post("/conv/get_response_doc")
 async def get_response(body: ConvRequest):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     resp = get_response_over_doc(body.user_message, body.conversation_id, body.document, body.user_id, body.memory)
 
     return {
@@ -110,6 +143,13 @@ async def get_response(body: ConvRequest):
 
 @app.post("/conv/get_user_conversations")
 async def get_user_conversation(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     result = get_user_conversations(body.user_id)
 
     return {
@@ -121,6 +161,13 @@ async def get_user_conversation(body: User):
 
 @app.post("/conv/get_selected_conv")
 async def get_selected_conv(body: Conversation):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     result = get_conv_by_id(body.conv_id)
 
     return {
@@ -133,6 +180,13 @@ async def get_selected_conv(body: Conversation):
 # HISTORY
 @app.post("/conv/get_history")
 async def get_history(body: Conversation):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     result = get_history_for_conv(body.conv_id, body.limit)
 
     return {
@@ -144,6 +198,13 @@ async def get_history(body: Conversation):
 
 @app.post("/conv/create")
 async def create_conv(body: Conversation):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     if body.user_id is None:
         return {
             "response": "User ID is required",
@@ -174,6 +235,12 @@ async def create_conv(body: Conversation):
 @app.post("/conv/history/feedback")
 async def history_feedback(body: History):
 
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     if body.hist_id is None:
         return {
             "response": "History ID is required",
@@ -190,13 +257,25 @@ async def history_feedback(body: History):
 
 
 @app.post("/conv/update")
-async def update_conv(body: Conversation):
-    if body.title is None:
+async def update_conv_title(body: Conversation):
+
+    if check_api_key(body.api_key) is False:
         return {
-            "response": "Title is required",
+            "response": "Invalid API Key",
             "code": 400,
         }
-    result = update_conversation(body.conv_id, body.title)
+
+    if body.title is not None:
+        result = update_conversation_title(body.conv_id, body.title)
+    elif body.active is not None:
+        result = update_conversation_active(body.conv_id, body.active)
+    elif body.summary is not None:
+        result = update_conversation_summary(body.conv_id, body.summary)
+    else:
+        return {
+            "response": "No data to update",
+            "code": 400,
+        }
 
     return {
         "response": result,
@@ -207,7 +286,13 @@ async def update_conv(body: Conversation):
 
 @app.post("/conv/delete")
 async def delete_conv(body: Conversation):
-    print(body.conv_id)
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     result = delete_conversation(body.conv_id)
 
     return {
@@ -220,6 +305,13 @@ async def delete_conv(body: Conversation):
 # DOCS
 @app.post("/docs/get_docs/user_id")
 async def get_indexes(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     try:
         if body.user_id == 0:
             docs = get_all_docs()
@@ -239,13 +331,19 @@ async def get_indexes(body: User):
 
 
 @app.post("/docs/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...)):
+async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...), api_key: str = Form(...)):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     try:
         res = create_vector_index(file, user_id, force)
         print('Uploading')
 
         if res['status'] == 'success':
-            # summary = get_file_summary(os.path.join("./db", str(res['data']['doc_id'])))
             summary = get_doc_summary(file, str(res['data']['doc_id']))
 
             return {
@@ -268,7 +366,12 @@ async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(.
 
 @app.post("/docs/delete")
 async def delete_doc(body: Document):
-    print(body.doc_id)
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
 
     if body.doc_id is not None:
         try:
@@ -293,6 +396,13 @@ async def delete_doc(body: Document):
 # USERS
 @app.post("/user/create")
 async def create_user(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     if body.name is None:
         return {
             "response": "Name is required",
@@ -335,6 +445,13 @@ async def create_user(body: User):
 
 @app.post("/user/login")
 async def login_user(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     user = get_user_by_email(body.email)
 
     if len(user) == 0:
@@ -372,6 +489,13 @@ async def login_user(body: User):
 
 @app.post("/user/get_user")
 async def get_user(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     user = get_user_by_id(body.user_id)
 
     return {
@@ -382,6 +506,13 @@ async def get_user(body: User):
 
 @app.post("/user/update_user_password")
 async def update_user_password(body: User):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
     user = get_user_by_id(body.user_id)
     psw = get_user_password(body.user_id)
     hs_function = hashlib.md5()
