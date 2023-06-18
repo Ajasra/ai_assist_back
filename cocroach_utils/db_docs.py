@@ -20,7 +20,7 @@ def get_user_docs(user_id):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM documents WHERE user_id = %s",
+                    "SELECT * FROM documents WHERE user_id = %s AND active = true",
                     (user_id,))
                 docs = []
                 for doc in cur.fetchall():
@@ -248,12 +248,15 @@ def delete_doc_by_id(doc_id):
     if conn is not None:
         try:
             with conn.cursor() as cur:
+                # cur.execute(
+                #     "DELETE FROM documents WHERE doc_id = %s",
+                #     (doc_id,))
                 cur.execute(
-                    "DELETE FROM documents WHERE doc_id = %s",
-                    (doc_id,))
+                    "UPDATE documents SET active = %s WHERE doc_id = %s",
+                    (False, doc_id))
                 conn.commit()
                 # delete folder and all files in it from the server './db/doc_id'
-                shutil.rmtree('./db/' + str(doc_id))
+                # shutil.rmtree('./db/' + str(doc_id))
                 return True
         except Exception as err:
             conn.rollback()

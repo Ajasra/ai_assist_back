@@ -84,6 +84,7 @@ def get_user_by_email(email):
                     "email": doc[2],
                     "password": doc[3],
                     "active": doc[4],
+                    "role": doc[5],
                 }
         except Exception as err:
             conn.rollback()
@@ -115,6 +116,7 @@ def get_user_by_username(username):
                     "email": doc[2],
                     "password": doc[3],
                     "active": doc[5],
+                    "role": doc[6],
                 }
         except Exception as err:
             conn.rollback()

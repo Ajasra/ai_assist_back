@@ -481,7 +481,8 @@ async def login_user(body: User):
             "user_id": user['user_id'],
             "name": user['name'],
             "email": user['email'],
-            "password": user['password']
+            "password": user['password'],
+            "role": user['role']
         },
         "code": 200,
     }
