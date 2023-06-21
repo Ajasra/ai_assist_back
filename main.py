@@ -333,7 +333,7 @@ async def get_indexes(body: User):
 @app.post("/docs/uploadfile/")
 async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...), api_key: str = Form(...)):
 
-    if check_api_key(body.api_key) is False:
+    if check_api_key(api_key) is False:
         return {
             "response": "Invalid API Key",
             "code": 400,
