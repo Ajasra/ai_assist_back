@@ -97,6 +97,8 @@ class History(BaseModel):
 
 
 def check_api_key(api_key):
+    print(api_key)
+    print(os.getenv("PUBLIC_API_KEY"))
     if api_key is None:
         return False
     if api_key == os.getenv("PUBLIC_API_KEY"):
