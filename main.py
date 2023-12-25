@@ -23,8 +23,8 @@ origins = [
     "http://localhost.com",
     "https://localhost.com",
     "http://localhost",
-    "http://localhost:3000",
-    "http://sokaris.link:3000",
+    "http://localhost:3001",
+    "http://sokaris.link:3001",
     "http://sokaris.link",
     "http://assistant.sokaris.link",
     "https://fr.sokaris.link",
@@ -32,7 +32,8 @@ origins = [
     "http://localhost:3008",
     "https://localhost:3008",
     "http://127.0.0.1:3008",
-    "http://fr.sokaris.link"
+    "http://fr.sokaris.link",
+    "http://127.0.0.1:3001",
 ]
 
 app.add_middleware(
