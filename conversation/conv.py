@@ -120,7 +120,7 @@ def get_simple_response(prompt, conv_id, user_id, history):
 
     try:
         response = chain.run(text=prompt)
-        hist_id = add_history(cur_conv, prompt, response, "")
+        add_history(cur_conv, prompt, response)
     except Exception as e:
         save_error(e)
         return {
@@ -131,14 +131,8 @@ def get_simple_response(prompt, conv_id, user_id, history):
 
     return {
         "status": "success",
-        "message": "Agent response",
-        "data": {
-            "response": response,
-            "follow_up_questions": "",
-            "source": "",
-            "conversation_id": cur_conv,
-            "history_id": hist_id
-        }
+        "message": response,
+        "conversation_id": cur_conv
     }
 
 

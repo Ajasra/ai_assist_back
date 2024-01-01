@@ -1,4 +1,4 @@
-# Description: Database functions for documents
+import shutil
 import time
 import pandas as pd
 
@@ -22,7 +22,6 @@ def get_user_docs(user_id):
                 cur.execute(
                     "SELECT * FROM documents WHERE user_id = %s AND active = true",
                     (user_id,))
-                conn.commit()
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
@@ -55,7 +54,6 @@ def get_doc_by_id(doc_id):
                 cur.execute(
                     "SELECT * FROM documents WHERE doc_id = %s",
                     (doc_id,))
-                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "doc_id": str(doc[0]),
@@ -84,7 +82,6 @@ def get_all_docs():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM documents")
-                conn.commit()
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
@@ -117,7 +114,6 @@ def get_doc_by_name(doc_name):
                 cur.execute(
                     "SELECT * FROM documents WHERE name = %s",
                     (doc_name,))
-                conn.commit()
                 doc = cur.fetchone()
                 return {
                         "doc_id": str(doc[0]),
