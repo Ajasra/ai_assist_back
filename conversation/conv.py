@@ -5,7 +5,8 @@ from langchain import LLMChain, PromptTemplate
 from langchain.chains.summarize import load_summarize_chain
 
 from langchain.chat_models import ChatOpenAI
-from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate
+from langchain.prompts import SystemMessagePromptTemplate, HumanMessagePromptTemplate, ChatPromptTemplate, \
+    MessagesPlaceholder
 from langchain.text_splitter import TokenTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
@@ -78,22 +79,15 @@ def get_doc_summary(file, doc_id, chunk_size=2048, chunk_overlap=64):
         }
 
 
-def get_simple_response(prompt, conv_id, user_id, history):
+def get_simple_response(prompt, conv_id, user_id, memory=10):
     """
     Get a simple response from the model
-    :param history:
+    :param memory:
     :param user_id:
     :param prompt:
     :param conv_id:
     :return:
     """
-
-    # if moderation(prompt):
-    #     return {
-    #         "status": "error",
-    #         "message": "Please be polite",
-    #         "conversation_id": conv_id
-    #     }
 
     cur_conv = get_conv_id(conv_id, user_id, 0)
     if cur_conv == -1:
@@ -103,23 +97,55 @@ def get_simple_response(prompt, conv_id, user_id, history):
             "conversation_id": conv_id
         }
 
+    template = """You are a chatbot having a conversation with a human.
+
+    {chat_history}
+    Human: {human_input}
+    Chatbot:"""
+
+    prompt_template = PromptTemplate(
+        input_variables=["chat_history", "human_input"], template=template
+    )
+    memory_obj = ConversationBufferMemory(memory_key="chat_history")
+
+    if memory != -1:
+        # get history from db
+        history = get_history_for_conv(cur_conv, 2)
+        if history is not None:
+            # from last to first
+            history.reverse()
+            for hist in history:
+                memory_obj.save_context(
+                    {"question": hist["prompt"]},
+                    {"output": hist["answer"]})
+
+    chain = LLMChain(
+        llm=llm,
+        prompt=prompt_template,
+        verbose=True,
+        memory=memory_obj,
+    )
+
+    # Notice that we just pass in the `question` variables - `chat_history` gets populated by memory
+    # chain({"question": prompt})
+
     # system = PromptTemplate(
     #     template="You are a helpful assistant that translates {input_language} to {output_language}.",
     #     input_variables=["input_language", "output_language"],
     # )
-    system = PromptTemplate(
-        template="",
-        input_variables=[],
-    )
-    system_message_prompt = SystemMessagePromptTemplate(prompt=system)
-    human_template = "{text}"
-    human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
-
-    chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
-    chain = LLMChain(llm=llm, prompt=chat_prompt)
+    # system = PromptTemplate(
+    #     template="",
+    #     input_variables=[],
+    # )
+    # system_message_prompt = SystemMessagePromptTemplate(prompt=system)
+    # human_template = "{text}"
+    # human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
+    #
+    # chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
+    # chain = LLMChain(llm=llm, prompt=chat_prompt)
 
     try:
-        response = chain.run(text=prompt)
+        response = chain.predict(human_input=prompt)
         hist_id = add_history(cur_conv, prompt, response, "")
     except Exception as e:
         save_error(e)
@@ -144,13 +170,6 @@ def get_simple_response(prompt, conv_id, user_id, history):
 
 def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
     if doc_id is not None:
-
-        # if moderation(prompt):
-        #     return {
-        #         "status": "error",
-        #         "message": "Please be polite",
-        #         "conversation_id": conv_id
-        #     }
 
         user_prompt = prompt
         history = []
