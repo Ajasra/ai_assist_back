@@ -1,5 +1,4 @@
-
-
+# This file contains all the functions for the conversations table
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_history import delete_history_by_conv_id
 from cocroach_utils.database_utils import connect_to_db
@@ -22,6 +21,7 @@ def get_all_conversations(user_id):
         try:
             with conn.cursor() as cur:
                 cur.execute("SELECT * FROM conversations")
+                conn.commit()
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
@@ -30,7 +30,8 @@ def get_all_conversations(user_id):
                         "doc_id": str(doc[2]),
                         "title": doc[3],
                         "active": doc[4],
-                        "summary": doc[5]
+                        "summary": doc[5],
+                        "model": doc[6]
                     })
                 return docs
         except Exception as err:
@@ -55,6 +56,7 @@ def get_user_conversations(user_id):
                 cur.execute(
                     "SELECT * FROM conversations WHERE user_id = %s AND active = true",
                     (user_id,))
+                conn.commit()
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
@@ -63,7 +65,8 @@ def get_user_conversations(user_id):
                         "doc_id": str(doc[2]),
                         "title": doc[3],
                         "active": doc[4],
-                        "summary": doc[5]
+                        "summary": doc[5],
+                        "model": doc[6]
                     })
                 return docs
         except Exception as err:
@@ -88,6 +91,7 @@ def get_conv_by_id(conversation_id):
                 cur.execute(
                     "SELECT * FROM conversations WHERE conv_id = %s",
                     (conversation_id,))
+                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "conv_id": str(doc[0]),
@@ -95,7 +99,8 @@ def get_conv_by_id(conversation_id):
                     "doc_id": str(doc[2]),
                     "title": doc[3],
                     "active": doc[4],
-                    "summary": doc[5]
+                    "summary": doc[5],
+                    "model": doc[6]
                 }
         except Exception as err:
             conn.rollback()
@@ -106,7 +111,7 @@ def get_conv_by_id(conversation_id):
         return []
 
 
-def add_conversation(user_id, doc_id, title="New conversation"):
+def add_conversation(user_id, doc_id=None, title="New conversation", model=0):
     """
     Add conversation to the database and return the new conv_id
     :param user_id:
@@ -119,8 +124,8 @@ def add_conversation(user_id, doc_id, title="New conversation"):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO conversations (user_id, doc_id, title) VALUES (%s, %s, %s) RETURNING conv_id",
-                    (user_id, doc_id, title))
+                    "INSERT INTO conversations (user_id, doc_id, title, model) VALUES (%s, %s, %s, %s) RETURNING conv_id",
+                    (user_id, doc_id, title, model))
                 conn.commit()
                 return str(cur.fetchone()[0])
         except Exception as err:
@@ -201,6 +206,31 @@ def update_conversation_active(conversation_id, active = 1):
                 cur.execute(
                     "UPDATE conversations SET active = %s WHERE conv_id = %s",
                     (active, conversation_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
+def update_conversation_model(conversation_id, model):
+    """
+    Update conversation in the database
+    :param conversation_id:
+    :param model:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET model = %s WHERE conv_id = %s",
+                    (model, conversation_id))
                 conn.commit()
                 return True
         except Exception as err:

@@ -1,7 +1,4 @@
-import psycopg2 as psycopg2
-import os
-from dotenv import load_dotenv
-
+# This file contains all the functions related to the users table in the database
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.database_utils import connect_to_db
 
@@ -21,6 +18,7 @@ def get_user_by_id(user_id):
                 cur.execute(
                     "SELECT * FROM users WHERE user_id = %s",
                     (user_id,))
+                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "user_id": str(doc[0]),
@@ -52,6 +50,7 @@ def get_user_password(user_id):
                 cur.execute(
                     "SELECT password FROM users WHERE user_id = %s",
                     (user_id,))
+                conn.commit()
                 doc = cur.fetchone()
                 return doc[0]
         except Exception as err:
@@ -77,6 +76,7 @@ def get_user_by_email(email):
                 cur.execute(
                     "SELECT * FROM users WHERE email = %s",
                     (email,))
+                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "user_id": str(doc[0]),
@@ -109,6 +109,7 @@ def get_user_by_username(username):
                 cur.execute(
                     "SELECT * FROM users WHERE name = %s",
                     (username,))
+                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "user_id": str(doc[0]),
@@ -139,6 +140,7 @@ def get_all_users():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM users")
+                conn.commit()
                 users = []
                 for doc in cur.fetchall():
                     users.append({
@@ -229,6 +231,86 @@ def delete_user(user_id):
                     "DELETE FROM users WHERE user_id = %s",
                     (user_id,))
                 conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
+def update_user_time(user_id):
+    """
+    Update user last login time
+    :param user_id:
+    :return:
+    """
+    conn = connect_to_db()
+
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET last_active = NOW() WHERE user_id = %s",
+                    (user_id,))
+                conn.commit()
+                conn.close()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
+def get_user_tokens(user_id):
+    """
+    Get user tokens
+    :param user_id:
+    :return:
+    """
+    conn = connect_to_db()
+
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT tokens_used FROM users WHERE user_id = %s", (user_id,))
+                conn.commit()
+                tokens = []
+                result = cur.fetchone()[0]
+                # convert string to dict
+                tokens = eval(result)
+                return tokens
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return []
+    else:
+        save_error("No connection to the database")
+        return []
+
+
+def update_user_tokens(user_id, tokens):
+    """
+    Update user tokens
+    :param user_id:
+    :param tokens:
+    :return:
+    """
+    conn = connect_to_db()
+
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                # convert dict to string
+                tokens = str(tokens)
+                cur.execute("UPDATE users SET tokens_used = %s WHERE user_id = %s", (tokens, user_id,))
+                conn.commit()
+                conn.close()
                 return True
         except Exception as err:
             conn.rollback()

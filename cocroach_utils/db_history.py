@@ -1,6 +1,6 @@
+# This file contains all the functions related to the conversation history table in the database
 import time
 import pandas as pd
-import psycopg2 as psycopg2
 
 from cocroach_utils.db_errors import save_error
 from cocroach_utils.database_utils import connect_to_db
@@ -19,6 +19,7 @@ def get_history_for_conv(conversation_id, limit=10):
                 cur.execute(
                     "SELECT * FROM history WHERE conv_id = %s ORDER BY time DESC LIMIT %s",
                     (conversation_id, limit))
+                conn.commit()
                 # format the response into the list of dict with keys
                 # hist_id, conv_id, prompt, answer, feedback, time
                 docs = []
@@ -55,6 +56,7 @@ def get_selected_history(history_id):
                 cur.execute(
                     "SELECT * FROM history WHERE hist_id = %s",
                     (history_id,))
+                conn.commit()
                 doc = cur.fetchone()
                 return {
                     "hist_id": str(doc[0]),
@@ -107,7 +109,7 @@ def add_history(conv_id, prompt, answer, followup=None, feedback=0):
         return -1
 
 
-def update_history_feedback_by_id(history_id, feedback = 1):
+def update_history_feedback_by_id(history_id, feedback=1):
     """
     Update feedback for the history
     :param history_id:
@@ -130,6 +132,7 @@ def update_history_feedback_by_id(history_id, feedback = 1):
     else:
         save_error("No connection to the database")
         return False
+
 
 def update_sorces_hist_by_id(history_id, sources):
     """
@@ -154,6 +157,7 @@ def update_sorces_hist_by_id(history_id, sources):
     else:
         save_error("No connection to the database")
         return False
+
 
 def delete_history_by_id(history_id):
     """
