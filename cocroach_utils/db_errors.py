@@ -1,3 +1,4 @@
+# Receives errors and saves them to the database
 import time
 import pandas as pd
 
@@ -41,6 +42,7 @@ def get_errors():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM errors")
+                conn.commit()
                 return cur.fetchall()
         except Exception as err:
             conn.rollback()
@@ -64,6 +66,7 @@ def get_errors_by_time(start_time, end_time):
                 cur.execute(
                     "SELECT * FROM errors WHERE date >= %s AND date <= %s",
                     (pd.Timestamp(start_time, unit='s'), pd.Timestamp(end_time, unit='s')))
+                conn.commit()
                 return cur.fetchall()
         except Exception as err:
             conn.rollback()

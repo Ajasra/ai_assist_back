@@ -29,9 +29,7 @@ origins = [
     "http://assistant.sokaris.link",
     "https://fr.sokaris.link",
     "http://fr.sokaris.link",
-    "http://localhost:3008",
-    "https://localhost:3008",
-    "http://127.0.0.1:3008",
+    "https://localhost:3001",
     "http://fr.sokaris.link",
     "http://127.0.0.1:3001",
 ]
@@ -115,6 +113,10 @@ def read_root():
 # CONVERSATIONS
 @app.post("/conv/get_response")
 async def get_response(body: ConvRequest):
+    """
+    :param body:
+    :return:
+    """
 
     if check_api_key(body.api_key) is False:
         return {
@@ -216,12 +218,6 @@ async def create_conv(body: Conversation):
     if body.user_id is None:
         return {
             "response": "User ID is required",
-            "code": 400,
-        }
-
-    if body.doc_id is None:
-        return {
-            "response": "Document ID is required",
             "code": 400,
         }
 
