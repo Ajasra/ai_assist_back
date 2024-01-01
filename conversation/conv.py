@@ -25,7 +25,7 @@ load_dotenv()
 model_name = ["gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k"]
 persist_directory = './db'
 
-llm = ChatOpenAI(temperature=.0, model_name=model_name[0], verbose=True, model_kwargs={"stream": False})
+llm = ChatOpenAI(temperature=.0, model_name=model_name[0], verbose=False, model_kwargs={"stream": False})
 
 
 def get_doc_summary(file, doc_id, chunk_size=2048, chunk_overlap=64):
@@ -125,24 +125,6 @@ def get_simple_response(prompt, conv_id, user_id, memory=10):
         verbose=True,
         memory=memory_obj,
     )
-
-    # Notice that we just pass in the `question` variables - `chat_history` gets populated by memory
-    # chain({"question": prompt})
-
-    # system = PromptTemplate(
-    #     template="You are a helpful assistant that translates {input_language} to {output_language}.",
-    #     input_variables=["input_language", "output_language"],
-    # )
-    # system = PromptTemplate(
-    #     template="",
-    #     input_variables=[],
-    # )
-    # system_message_prompt = SystemMessagePromptTemplate(prompt=system)
-    # human_template = "{text}"
-    # human_message_prompt = HumanMessagePromptTemplate.from_template(human_template)
-    #
-    # chat_prompt = ChatPromptTemplate.from_messages([system_message_prompt, human_message_prompt])
-    # chain = LLMChain(llm=llm, prompt=chat_prompt)
 
     try:
         response = chain.predict(human_input=prompt)
