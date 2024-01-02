@@ -26,7 +26,7 @@ def get_conv_id(conv_id, user_id, doc_id):
             save_error("Conversation not found")
             cur_conv = -1
         else:
-            cur_conv = conv_id
+            cur_conv = conv
 
     return cur_conv
 

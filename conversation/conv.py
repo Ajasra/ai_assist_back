@@ -22,11 +22,10 @@ from vectordb.vectordb import get_embedding_model
 from vectordb.vectordb import get_loader
 
 load_dotenv()
-model_name = ["gpt-3.5-turbo-0613", "gpt-3.5-turbo-16k"]
+model_name = ["gpt-3.5-turbo", "gpt-3.5-turbo-16k"]
 persist_directory = './db'
 
 llm = ChatOpenAI(temperature=.0, model_name=model_name[0], verbose=False, model_kwargs={"stream": False})
-
 
 def get_doc_summary(file, doc_id, chunk_size=2048, chunk_overlap=64):
     if file.filename == '':
@@ -110,7 +109,7 @@ def get_simple_response(prompt, conv_id, user_id, memory=10):
 
     if memory != -1:
         # get history from db
-        history = get_history_for_conv(cur_conv, 2)
+        history = get_history_for_conv(conv_id, 2)
         if history is not None:
             # from last to first
             history.reverse()
@@ -119,8 +118,10 @@ def get_simple_response(prompt, conv_id, user_id, memory=10):
                     {"question": hist["prompt"]},
                     {"output": hist["answer"]})
 
+    cur_llm = ChatOpenAI(temperature=.0, model_name=cur_conv['model'], verbose=False, model_kwargs={"stream": False})
+
     chain = LLMChain(
-        llm=llm,
+        llm=cur_llm,
         prompt=prompt_template,
         verbose=True,
         memory=memory_obj,
@@ -128,13 +129,13 @@ def get_simple_response(prompt, conv_id, user_id, memory=10):
 
     try:
         response = chain.predict(human_input=prompt)
-        hist_id = add_history(cur_conv, prompt, response, "")
+        hist_id = add_history(conv_id, prompt, response, "")
     except Exception as e:
         save_error(e)
         return {
             "status": "error",
             "message": str(e),
-            "conversation_id": cur_conv
+            "conversation_id":str(conv_id)
         }
 
     return {
@@ -144,8 +145,8 @@ def get_simple_response(prompt, conv_id, user_id, memory=10):
             "response": response,
             "follow_up_questions": "",
             "source": "",
-            "conversation_id": cur_conv,
-            "history_id": hist_id
+            "conversation_id": str(conv_id),
+            "history_id": str(hist_id)
         }
     }
 
@@ -197,7 +198,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
 
         if memory != -1:
             # get history from db
-            history = get_history_for_conv(cur_conv, 2)
+            history = get_history_for_conv(conv_id, 2)
             if history is not None:
                 # from last to first
                 history.reverse()
@@ -207,8 +208,11 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                         {"output": hist["answer"]}
                     )
 
+        cur_llm = ChatOpenAI(temperature=.0, model_name=cur_conv['model'], verbose=False,
+                             model_kwargs={"stream": False})
+
         cur_conversation = RetrievalQA.from_chain_type(
-            llm=llm,
+            llm=cur_llm,
             chain_type="stuff",
             retriever=retriever,
             return_source_documents=True,
@@ -232,7 +236,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 print("response: ", response)
 
                 if response["answer"] == "NONE":
-                    result = get_simple_response(user_prompt, cur_conv, user_id, history)
+                    result = get_simple_response(user_prompt, conv_id, user_id, history)
                     print("result: ", result)
                     if result["status"] == "success":
                         response["answer"] = result["message"]
@@ -240,7 +244,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                         return {
                             "status": "error",
                             "message": "Error while getting response",
-                            "conversation_id": str(cur_conv),
+                            "conversation_id": str(conv_id),
                             "data": {
                                 "response": "Error while getting response",
                             }
@@ -252,7 +256,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
             return {
                 "status": "error",
                 "message": "Error while getting response",
-                "conversation_id": str(cur_conv),
+                "conversation_id": str(conv_id),
                 "data": {
                     "response": str(e),
                 }
@@ -266,7 +270,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
         follow_up = get_follow_up_questions_doc(doc_id, history)
 
         follow_up_str = "\n".join(follow_up)
-        hist_id = add_history(cur_conv, prompt, response["answer"], follow_up_str)
+        hist_id = add_history(conv_id, prompt, response["answer"], follow_up_str)
 
         source = []
         if result["source_documents"] is not None:
@@ -279,7 +283,7 @@ def get_response_over_doc(prompt, conv_id, doc_id, user_id, memory):
                 "response": response["answer"],
                 "follow_up_questions": follow_up,
                 "source": DocumentsToStr(result["source_documents"]),
-                "conversation_id": str(cur_conv),
+                "conversation_id": str(conv_id),
                 "history_id": hist_id
             }
         }

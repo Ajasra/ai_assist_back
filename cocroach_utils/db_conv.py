@@ -20,7 +20,9 @@ def get_all_conversations(user_id):
     if conn is not None:
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT * FROM conversations")
+                cur.execute(
+                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id",
+                    (user_id,))
                 conn.commit()
                 docs = []
                 for doc in cur.fetchall():
@@ -54,7 +56,7 @@ def get_user_conversations(user_id):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM conversations WHERE user_id = %s AND active = true",
+                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id WHERE user_id = %s AND active = TRUE",
                     (user_id,))
                 conn.commit()
                 docs = []
@@ -88,8 +90,10 @@ def get_conv_by_id(conversation_id):
     if conn is not None:
         try:
             with conn.cursor() as cur:
+                # get conversation by conv_id where 'model' field assigned by _id from the models table
+                # model is replaced by the field 'name' from the models table
                 cur.execute(
-                    "SELECT * FROM conversations WHERE conv_id = %s",
+                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id WHERE conv_id = %s",
                     (conversation_id,))
                 conn.commit()
                 doc = cur.fetchone()
