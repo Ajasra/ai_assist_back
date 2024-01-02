@@ -20,8 +20,11 @@ def get_all_conversations(user_id):
     if conn is not None:
         try:
             with conn.cursor() as cur:
+                # add to below also assistant.title from assistants table by conversations.assistant
                 cur.execute(
-                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id",
+                    "SELECT conv_id, user_id, doc_id, conversations.title, active, summary, models.name, "
+                    "assistants.title FROM conversations LEFT JOIN models ON conversations.model = models._id LEFT "
+                    "JOIN assistants ON conversations.assistant = assistants._id",
                     (user_id,))
                 conn.commit()
                 docs = []
@@ -33,7 +36,8 @@ def get_all_conversations(user_id):
                         "title": doc[3],
                         "active": doc[4],
                         "summary": doc[5],
-                        "model": doc[6]
+                        "model": doc[6],
+                        "assistant": doc[7]
                     })
                 return docs
         except Exception as err:
@@ -56,7 +60,10 @@ def get_user_conversations(user_id):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id WHERE user_id = %s AND active = TRUE",
+                    "SELECT conv_id, user_id, doc_id, conversations.title, active, summary, models.name, "
+                    "assistants.title, assistants.system_prompt FROM conversations LEFT JOIN models ON conversations.model = models._id LEFT "
+                    "JOIN assistants ON conversations.assistant = assistants._id "
+                    "WHERE conversations.user_id = %s",
                     (user_id,))
                 conn.commit()
                 docs = []
@@ -68,7 +75,9 @@ def get_user_conversations(user_id):
                         "title": doc[3],
                         "active": doc[4],
                         "summary": doc[5],
-                        "model": doc[6]
+                        "model": doc[6],
+                        "assistant": doc[7],
+                        "system_prompt": doc[8]
                     })
                 return docs
         except Exception as err:
@@ -90,10 +99,11 @@ def get_conv_by_id(conversation_id):
     if conn is not None:
         try:
             with conn.cursor() as cur:
-                # get conversation by conv_id where 'model' field assigned by _id from the models table
-                # model is replaced by the field 'name' from the models table
                 cur.execute(
-                    "SELECT conv_id, user_id, doc_id, title, active, summary, models.name FROM conversations LEFT JOIN models ON conversations.model = models._id WHERE conv_id = %s",
+                    "SELECT conv_id, user_id, doc_id, conversations.title, active, summary, models.name, "
+                    "assistants.title, assistants.system_prompt FROM conversations LEFT JOIN models ON conversations.model = models._id LEFT "
+                    "JOIN assistants ON conversations.assistant = assistants._id "
+                    "WHERE conv_id = %s",
                     (conversation_id,))
                 conn.commit()
                 doc = cur.fetchone()
@@ -104,7 +114,9 @@ def get_conv_by_id(conversation_id):
                     "title": doc[3],
                     "active": doc[4],
                     "summary": doc[5],
-                    "model": doc[6]
+                    "model": doc[6],
+                    "assistant": doc[7],
+                    "system_prompt": doc[8]
                 }
         except Exception as err:
             conn.rollback()
@@ -115,7 +127,7 @@ def get_conv_by_id(conversation_id):
         return []
 
 
-def add_conversation(user_id, doc_id=None, title="New conversation", model=0):
+def add_conversation(user_id, doc_id=None, title="New conversation", model=0, assistant=0)
     """
     Add conversation to the database and return the new conv_id
     :param user_id:
@@ -128,8 +140,8 @@ def add_conversation(user_id, doc_id=None, title="New conversation", model=0):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO conversations (user_id, doc_id, title, model) VALUES (%s, %s, %s, %s) RETURNING conv_id",
-                    (user_id, doc_id, title, model))
+                    "INSERT INTO conversations (user_id, doc_id, title, model, assistant) VALUES (%s, %s, %s, %s, %s) RETURNING conv_id",
+                    (user_id, doc_id, title, model, assistant))
                 conn.commit()
                 return str(cur.fetchone()[0])
         except Exception as err:
@@ -235,6 +247,31 @@ def update_conversation_model(conversation_id, model):
                 cur.execute(
                     "UPDATE conversations SET model = %s WHERE conv_id = %s",
                     (model, conversation_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
+def update_conversation_assistant(conversation_id, assistant):
+    """
+    Update conversation in the database
+    :param conversation_id:
+    :param assistant:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET assistant = %s WHERE conv_id = %s",
+                    (assistant, conversation_id))
                 conn.commit()
                 return True
         except Exception as err:
