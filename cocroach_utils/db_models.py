@@ -9,8 +9,16 @@ def get_all_models():
             with conn.cursor() as cur:
                 cur.execute(
                     "SELECT * FROM models")
-                rows = cur.fetchall()
-                return rows
+                models = []
+                for model in cur.fetchall():
+                    models.append({
+                        "id": model[0],
+                        "name": model[1],
+                        "description": model[2],
+                        "price_in": model[3],
+                        "price_out": model[4]
+                    })
+                return models
 
         except Exception as err:
             conn.rollback()
@@ -30,7 +38,13 @@ def get_model_by_id(model_id):
                     "SELECT * FROM models WHERE _id = %s",
                     (model_id,))
                 row = cur.fetchone()
-                return row
+                return {
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "price_in": row[3],
+                    "price_out": row[4]
+                }
 
         except Exception as err:
             conn.rollback()

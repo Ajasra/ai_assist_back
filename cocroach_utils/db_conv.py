@@ -127,7 +127,7 @@ def get_conv_by_id(conversation_id):
         return []
 
 
-def add_conversation(user_id, doc_id=None, title="New conversation", model=0, assistant=0)
+def add_conversation(user_id, doc_id=None, title="New conversation", model=0, assistant=0):
     """
     Add conversation to the database and return the new conv_id
     :param user_id:
@@ -151,6 +151,32 @@ def add_conversation(user_id, doc_id=None, title="New conversation", model=0, as
     else:
         save_error("No connection to the database")
         return -1
+
+
+def update_conversation_field(conversation_id, field, value):
+    """
+    Update conversation in the database
+    :param conversation_id:
+    :param field:
+    :param value:
+    :return:
+    """
+    conn = connect_to_db()
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE conversations SET " + field + " = %s WHERE conv_id = %s",
+                    (value, conversation_id))
+                conn.commit()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
 
 
 def update_conversation_title(conversation_id, title):

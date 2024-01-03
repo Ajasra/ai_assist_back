@@ -6,10 +6,12 @@ from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
+from cocroach_utils.db_models import get_all_models, get_model_by_id
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
 from cocroach_utils.db_history import get_history_for_conv, update_history_feedback_by_id
-from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation_title, delete_conversation, \
-    add_conversation, update_conversation_active, update_conversation_summary
+from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation_title, \
+    delete_conversation, \
+    add_conversation, update_conversation_active, update_conversation_summary, update_conversation_field
 from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
 from vectordb.vectordb import create_vector_index
 from conversation.conv import get_response_over_doc, get_simple_response, get_doc_summary
@@ -75,12 +77,27 @@ class Conversation(BaseModel):
     active: bool = None
     summary: str = None
     api_key: str = None
+    model: str = None
+    assistant: str = None
 
 
 class DocRequest(BaseModel):
     file: UploadFile = File(...)
     user_id: int = Form(...)
     force: bool = Form(...)
+
+
+class EmptyRequest(BaseModel):
+    api_key: str = None
+
+
+class Model(BaseModel):
+    api_key: str = None
+    model_id: int = 0
+    model_name: str = ""
+    model_description: str = ""
+    model_price_in: float = 0
+    model_price_out: float = 0
 
 
 class Document(BaseModel):
@@ -270,11 +287,15 @@ async def update_conv_title(body: Conversation):
         }
 
     if body.title is not None:
-        result = update_conversation_title(body.conv_id, body.title)
+        result = update_conversation_field(body.conv_id, 'title', body.title)
     elif body.active is not None:
-        result = update_conversation_active(body.conv_id, body.active)
+        result = update_conversation_field(body.conv_id, 'acttive', body.active)
     elif body.summary is not None:
-        result = update_conversation_summary(body.conv_id, body.summary)
+        result = update_conversation_field(body.conv_id, 'summary', body.summary)
+    elif body.model is not None:
+        result = update_conversation_field(body.conv_id, 'model', body.model)
+    elif body.assistant is not None:
+        result = update_conversation_field(body.conv_id, 'assistant', body.assistant)
     else:
         return {
             "response": "No data to update",
@@ -540,3 +561,40 @@ async def update_user_password(body: User):
         "data": result,
         "code": 200,
     }
+
+
+@app.post("/models/get_models")
+async def get_models(body: Model):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
+    models = get_all_models()
+
+    return {
+        "status": "success",
+        "response": models,
+        "code": 200,
+    }
+
+
+@app.post("/models/get_model_by_id")
+async def get_model_id(body: Model):
+
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
+    model = get_model_by_id(body.model_id)
+
+    return {
+        "status": "success",
+        "response": model,
+        "code": 200,
+    }
+
