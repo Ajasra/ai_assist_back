@@ -8,14 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from cocroach_utils.db_models import get_all_models, get_model_by_id
 from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
-from cocroach_utils.db_history import get_history_for_conv, update_history_feedback_by_id
-from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, update_conversation_title, \
+from cocroach_utils.db_history import get_history_for_conv, update_history_field_by_id, delete_history_by_id
+from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, \
     delete_conversation, \
-    add_conversation, update_conversation_active, update_conversation_summary, update_conversation_field
-from cocroach_utils.db_docs import update_doc_summary_by_id, get_user_docs, get_all_docs, delete_doc_by_id
+    add_conversation, update_conversation_field
+from cocroach_utils.db_docs import get_user_docs, get_all_docs, delete_doc_by_id
 from vectordb.vectordb import create_vector_index
 from conversation.conv import get_response_over_doc, get_simple_response, get_doc_summary
-
 
 load_dotenv()
 app = FastAPI()
@@ -111,7 +110,6 @@ class History(BaseModel):
     api_key: str = None
 
 
-
 def check_api_key(api_key):
     print(api_key)
     print(os.getenv("PUBLIC_API_KEY"))
@@ -152,7 +150,6 @@ async def get_response(body: ConvRequest):
 
 @app.post("/conv/get_response_doc")
 async def get_response(body: ConvRequest):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -170,7 +167,6 @@ async def get_response(body: ConvRequest):
 
 @app.post("/conv/get_user_conversations")
 async def get_user_conversation(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -188,7 +184,6 @@ async def get_user_conversation(body: User):
 
 @app.post("/conv/get_selected_conv")
 async def get_selected_conv(body: Conversation):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -207,7 +202,6 @@ async def get_selected_conv(body: Conversation):
 # HISTORY
 @app.post("/conv/get_history")
 async def get_history(body: Conversation):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -223,9 +217,25 @@ async def get_history(body: Conversation):
     }
 
 
+@app.post("history/delete")
+async def delete_history(body: History):
+    if check_api_key(body.api_key) is False:
+        return {
+            "response": "Invalid API Key",
+            "code": 400,
+        }
+
+    result = delete_history_by_id(body.hist_id)
+
+    return {
+        "response": result,
+        "debug": debug,
+        "code": 200,
+    }
+
+
 @app.post("/conv/create")
 async def create_conv(body: Conversation):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -255,7 +265,6 @@ async def create_conv(body: Conversation):
 
 @app.post("/conv/history/feedback")
 async def history_feedback(body: History):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -268,7 +277,7 @@ async def history_feedback(body: History):
             "code": 400,
         }
 
-    result = update_history_feedback_by_id(body.hist_id, body.feedback)
+    result = update_history_field_by_id(body.hist_id, 'feedback', body.feedback)
 
     return {
         "response": result,
@@ -279,7 +288,6 @@ async def history_feedback(body: History):
 
 @app.post("/conv/update")
 async def update_conv_title(body: Conversation):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -289,7 +297,7 @@ async def update_conv_title(body: Conversation):
     if body.title is not None:
         result = update_conversation_field(body.conv_id, 'title', body.title)
     elif body.active is not None:
-        result = update_conversation_field(body.conv_id, 'acttive', body.active)
+        result = update_conversation_field(body.conv_id, 'active', body.active)
     elif body.summary is not None:
         result = update_conversation_field(body.conv_id, 'summary', body.summary)
     elif body.model is not None:
@@ -311,7 +319,6 @@ async def update_conv_title(body: Conversation):
 
 @app.post("/conv/delete")
 async def delete_conv(body: Conversation):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -330,7 +337,6 @@ async def delete_conv(body: Conversation):
 # DOCS
 @app.post("/docs/get_docs/user_id")
 async def get_indexes(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -345,6 +351,7 @@ async def get_indexes(body: User):
     except Exception as e:
         return {
             "response": "Cant get docs",
+            "message": str(e),
             "code": 400,
         }
 
@@ -356,8 +363,8 @@ async def get_indexes(body: User):
 
 
 @app.post("/docs/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...), api_key: str = Form(...)):
-
+async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...),
+                             api_key: str = Form(...)):
     if check_api_key(api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -391,7 +398,6 @@ async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(.
 
 @app.post("/docs/delete")
 async def delete_doc(body: Document):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -421,7 +427,6 @@ async def delete_doc(body: Document):
 # USERS
 @app.post("/user/create")
 async def create_user(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -446,7 +451,6 @@ async def create_user(body: User):
 
     # create hash for password
     hs_function = hashlib.md5()
-    password = hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
 
     try:
@@ -470,7 +474,6 @@ async def create_user(body: User):
 
 @app.post("/user/login")
 async def login_user(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -492,7 +495,6 @@ async def login_user(body: User):
         }
 
     hs_function = hashlib.md5()
-    password = hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
 
     if user['password'] != password:
@@ -515,7 +517,6 @@ async def login_user(body: User):
 
 @app.post("/user/get_user")
 async def get_user(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -532,7 +533,6 @@ async def get_user(body: User):
 
 @app.post("/user/update_user_password")
 async def update_user_password(body: User):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -542,10 +542,8 @@ async def update_user_password(body: User):
     user = get_user_by_id(body.user_id)
     psw = get_user_password(body.user_id)
     hs_function = hashlib.md5()
-    old_password = hs_function.update(body.old_password.encode('utf-8'))
     old_password = hs_function.hexdigest()
 
-    new_password = hs_function.update(body.password.encode('utf-8'))
     new_password = hs_function.hexdigest()
 
     if psw != old_password:
@@ -565,7 +563,6 @@ async def update_user_password(body: User):
 
 @app.post("/models/get_models")
 async def get_models(body: Model):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -583,7 +580,6 @@ async def get_models(body: Model):
 
 @app.post("/models/get_model_by_id")
 async def get_model_id(body: Model):
-
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -597,4 +593,3 @@ async def get_model_id(body: Model):
         "response": model,
         "code": 200,
     }
-

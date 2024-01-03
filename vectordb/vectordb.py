@@ -10,7 +10,7 @@ from langchain.document_loaders import TextLoader, PyPDFLoader, UnstructuredEPub
     UnstructuredFileLoader
 from langchain.document_loaders import DirectoryLoader
 
-from cocroach_utils.db_errors import save_error
+from cocroach_utils.database_utils import save_error
 from cocroach_utils.db_docs import add_doc, get_doc_by_name
 
 # from langchain.embeddings import HuggingFaceEmbeddings

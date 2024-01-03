@@ -1,5 +1,4 @@
-from cocroach_utils.database_utils import connect_to_db
-from cocroach_utils.db_errors import save_error
+from cocroach_utils.database_utils import connect_to_db, save_error
 
 
 def get_all_assistants():
