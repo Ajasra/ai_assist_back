@@ -3,18 +3,16 @@ import openai
 import tiktoken
 from dotenv import load_dotenv
 
+from cocroach_utils.database_utils import save_error
 from cocroach_utils.db_conv import get_conv_by_id
-from cocroach_utils.db_errors import save_error
 
 load_dotenv()
 
 
-def get_conv_id(conv_id, user_id, doc_id):
+def get_conv_id(conv_id):
     """
     Get the conversation id and return a new one if it does not exist
     :param conv_id:
-    :param user_id:
-    :param doc_id:
     :return:
     """
     cur_conv = None

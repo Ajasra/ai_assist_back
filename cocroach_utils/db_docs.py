@@ -2,9 +2,7 @@
 import time
 import pandas as pd
 
-from cocroach_utils.db_errors import save_error
-
-from cocroach_utils.database_utils import connect_to_db
+from cocroach_utils.database_utils import connect_to_db, save_error
 
 
 # GET
@@ -120,12 +118,12 @@ def get_doc_by_name(doc_name):
                 conn.commit()
                 doc = cur.fetchone()
                 return {
-                        "doc_id": str(doc[0]),
-                        "name": doc[1],
-                        "summary": doc[2],
-                        "user_id": str(doc[3]),
-                        "updated": doc[4]
-                    }
+                    "doc_id": str(doc[0]),
+                    "name": doc[1],
+                    "summary": doc[2],
+                    "user_id": str(doc[3]),
+                    "updated": doc[4]
+                }
         except Exception as err:
             conn.rollback()
             save_error(err)
@@ -133,7 +131,6 @@ def get_doc_by_name(doc_name):
     else:
         save_error("No connection to the database")
         return []
-
 
 
 # ADD
@@ -164,11 +161,12 @@ def add_doc(user_id, doc_name, doc_text):
 
 
 # UPDATE
-def update_doc_summary_by_id(doc_id, doc_text):
+def update_doc_field_by_id(doc_id, field, value):
     """
-    Update doc summary
+    Update doc fields
     :param doc_id:
-    :param doc_text:
+    :param field:
+    :param value:
     :return:
     """
     conn = connect_to_db()
@@ -176,58 +174,8 @@ def update_doc_summary_by_id(doc_id, doc_text):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE documents SET summary = %s, updated = %s WHERE doc_id = %s",
-                    (doc_text, pd.Timestamp(time.time(), unit='s'),  doc_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_doc_steps_by_id(doc_id, steps):
-    """
-    Update doc summary
-    :param doc_id:
-    :param doc_text:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE documents SET updated = %s, summary_steps = %s WHERE doc_id = %s",
-                    ( pd.Timestamp(time.time(), unit='s'), steps, doc_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_doc_name_by_id(doc_id, doc_name):
-    """
-    Update doc name
-    :param doc_id:
-    :param doc_name:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE documents SET name = %s, updated = %s WHERE doc_id = %s",
-                    (doc_name, pd.Timestamp(time.time(), unit='s'), doc_id))
+                    "UPDATE documents SET " + field + " = %s, updated = %s WHERE doc_id = %s",
+                    (value, pd.Timestamp(time.time(), unit='s'), doc_id))
                 conn.commit()
                 return True
         except Exception as err:
@@ -248,7 +196,7 @@ def delete_doc_by_id(doc_id):
     """
     conn = connect_to_db()
 
-    print("delete_doc_by_id", doc_id    )
+    print("delete_doc_by_id", doc_id)
     if conn is not None:
         try:
             with conn.cursor() as cur:

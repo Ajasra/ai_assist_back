@@ -1,7 +1,6 @@
 # This file contains all the functions for the conversations table
-from cocroach_utils.db_errors import save_error
 from cocroach_utils.db_history import delete_history_by_conv_id
-from cocroach_utils.database_utils import connect_to_db
+from cocroach_utils.database_utils import connect_to_db, save_error
 from cocroach_utils.db_users import get_user_by_id
 
 
@@ -130,6 +129,8 @@ def get_conv_by_id(conversation_id):
 def add_conversation(user_id, doc_id=None, title="New conversation", model=0, assistant=0):
     """
     Add conversation to the database and return the new conv_id
+    :param assistant:
+    :param model:
     :param user_id:
     :param doc_id:
     :param title:
@@ -179,136 +180,6 @@ def update_conversation_field(conversation_id, field, value):
         return False
 
 
-def update_conversation_title(conversation_id, title):
-    """
-    Update conversation in the database
-    :param conversation_id:
-    :param title:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE conversations SET title = %s WHERE conv_id = %s",
-                    (title, conversation_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_conversation_summary(conversation_id, summary):
-    """
-    Update conversation in the database
-    :param conversation_id:
-    :param summary:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE conversations SET summary = %s WHERE conv_id = %s",
-                    (summary, conversation_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_conversation_active(conversation_id, active = 1):
-    """
-    Update conversation in the database
-    :param conversation_id:
-    :param active:
-    :return:
-    """
-    if active == 1:
-        active = True
-    else:
-        active = False
-
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE conversations SET active = %s WHERE conv_id = %s",
-                    (active, conversation_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_conversation_model(conversation_id, model):
-    """
-    Update conversation in the database
-    :param conversation_id:
-    :param model:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE conversations SET model = %s WHERE conv_id = %s",
-                    (model, conversation_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_conversation_assistant(conversation_id, assistant):
-    """
-    Update conversation in the database
-    :param conversation_id:
-    :param assistant:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE conversations SET assistant = %s WHERE conv_id = %s",
-                    (assistant, conversation_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
 def delete_conversation(conversation_id):
     """
     Delete conversation from the database
@@ -334,16 +205,19 @@ def delete_conversation(conversation_id):
         return False
 
 
-def delete_conversation_by_user(user_id):
+def delete_conversation_by_user(user_id, delete_history=False):
     """
     Delete conversation from the database
+    :param delete_history:
     :param user_id:
     :return:
     """
-    # get all conversations for the user
-    conversations = get_user_conversations(user_id)
-    # for conv in conversations:
-    #     delete_history_by_conv_id(conv[0])
+
+    if delete_history:
+        # get all conversations for the user
+        conversations = get_user_conversations(user_id)
+        for conv in conversations:
+            delete_history_by_conv_id(conv[0])
 
     conn = connect_to_db()
     if conn is not None:

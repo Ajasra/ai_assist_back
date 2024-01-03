@@ -1,7 +1,5 @@
 # This file contains all the functions related to the users table in the database
-from cocroach_utils.db_errors import save_error
-from cocroach_utils.database_utils import connect_to_db
-
+from cocroach_utils.database_utils import connect_to_db, save_error
 
 
 def get_user_by_id(user_id):
@@ -241,6 +239,34 @@ def delete_user(user_id):
         return False
 
 
+def update_user_field_by_id(user_id, field, value):
+    """
+    Update user in the database
+    :param user_id:
+    :param field:
+    :param value:
+    :return:
+    """
+    conn = connect_to_db()
+
+    if conn is not None:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET " + field + " = %s WHERE user_id = %s",
+                    (value, user_id))
+                conn.commit()
+                conn.close()
+                return True
+        except Exception as err:
+            conn.rollback()
+            save_error(err)
+            return False
+    else:
+        save_error("No connection to the database")
+        return False
+
+
 def update_user_time(user_id):
     """
     Update user last login time
@@ -292,30 +318,3 @@ def get_user_tokens(user_id):
     else:
         save_error("No connection to the database")
         return []
-
-
-def update_user_tokens(user_id, tokens):
-    """
-    Update user tokens
-    :param user_id:
-    :param tokens:
-    :return:
-    """
-    conn = connect_to_db()
-
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                # convert dict to string
-                tokens = str(tokens)
-                cur.execute("UPDATE users SET tokens_used = %s WHERE user_id = %s", (tokens, user_id,))
-                conn.commit()
-                conn.close()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False

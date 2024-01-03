@@ -12,11 +12,11 @@ from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
 
-from cocroach_utils.db_errors import save_error
+from cocroach_utils.database_utils import save_error
 from cocroach_utils.db_helper import DocumentsToStr
 from cocroach_utils.db_history import add_history, get_history_for_conv
-from cocroach_utils.db_docs import update_doc_summary_by_id, update_doc_steps_by_id, get_doc_by_id
-from conversation.conv_helper import get_conv_id, format_response, moderation
+from cocroach_utils.db_docs import get_doc_by_id, update_doc_field_by_id
+from conversation.conv_helper import get_conv_id, format_response
 
 from vectordb.vectordb import get_embedding_model
 from vectordb.vectordb import get_loader
@@ -55,9 +55,9 @@ def get_doc_summary(file, doc_id, chunk_size=2048, chunk_overlap=64):
         intermediate_steps = summary['intermediate_steps']
         intermediate_steps = "\n".join(intermediate_steps)
         result = summary['output_text']
-        update_doc_summary_by_id(doc_id, result)
+        update_doc_field_by_id(doc_id, "summary", result)
         try:
-            update_doc_steps_by_id(doc_id, intermediate_steps)
+            update_doc_field_by_id(doc_id, "summary_steps", intermediate_steps)
         except Exception as e:
             print("Error in updating steps: ", e)
 

@@ -2,13 +2,13 @@
 import time
 import pandas as pd
 
-from cocroach_utils.db_errors import save_error
-from cocroach_utils.database_utils import connect_to_db
+from cocroach_utils.database_utils import connect_to_db, save_error
 
 
 def get_history_for_conv(conversation_id, limit=10):
     """
     Get history for the conversation
+    :param limit:
     :param conversation_id:
     :return:
     """
@@ -20,8 +20,6 @@ def get_history_for_conv(conversation_id, limit=10):
                     "SELECT * FROM history WHERE conv_id = %s ORDER BY time DESC LIMIT %s",
                     (conversation_id, limit))
                 conn.commit()
-                # format the response into the list of dict with keys
-                # hist_id, conv_id, prompt, answer, feedback, time
                 docs = []
                 for doc in cur.fetchall():
                     docs.append({
@@ -96,7 +94,8 @@ def add_history(conv_id, prompt, answer, followup=None, feedback=0):
             with conn.cursor() as cur:
                 cur_time = pd.Timestamp(time.time(), unit='s')
                 cur.execute(
-                    "INSERT INTO history (conv_id, prompt, answer, feedback, time, followup) VALUES (%s, %s, %s, %s, %s, %s) RETURNING hist_id",
+                    "INSERT INTO history (conv_id, prompt, answer, feedback, time, followup) VALUES (%s, %s, %s, %s, "
+                    "%s, %s) RETURNING hist_id",
                     (conv_id, prompt, answer, feedback, cur_time, followup))
                 conn.commit()
                 return cur.fetchone()[0]
@@ -109,11 +108,12 @@ def add_history(conv_id, prompt, answer, followup=None, feedback=0):
         return -1
 
 
-def update_history_feedback_by_id(history_id, feedback=1):
+def update_history_field_by_id(history_id, field, value):
     """
-    Update feedback for the history
+    Update history in the database
     :param history_id:
-    :param feedback:
+    :param field:
+    :param value:
     :return:
     """
     conn = connect_to_db()
@@ -121,33 +121,8 @@ def update_history_feedback_by_id(history_id, feedback=1):
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE history SET feedback = %s WHERE hist_id = %s",
-                    (feedback, history_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
-
-
-def update_sorces_hist_by_id(history_id, sources):
-    """
-    Update sources for the history
-    :param history_id:
-    :param sources:
-    :return:
-    """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE history SET sources = %s WHERE hist_id = %s",
-                    (sources, history_id))
+                    "UPDATE history SET " + field + " = %s WHERE hist_id = %s",
+                    (value, history_id))
                 conn.commit()
                 return True
         except Exception as err:

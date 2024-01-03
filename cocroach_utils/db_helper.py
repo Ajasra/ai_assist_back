@@ -28,4 +28,3 @@ def DocumentsToStr(documents):
     sources = json.dumps(sources)
 
     return sources
-
