@@ -80,12 +80,23 @@ def fetch_one(cursor, query, params):
     :param params:
     :return:
     """
-    cursor.execute(query, params)
-    result = cursor.fetchone()
-    if result:
+    try:
+        cursor.execute(query, params)
+        if cursor.rowcount == 0:
+            print("No results found")
+            return None
+        # i want to fetch one row in dict format (column name: value)
         columns = [col[0] for col in cursor.description]
-        return dict(zip(columns, result))
-    return None
+        result = dict(zip(columns, cursor.fetchone()))
+        print(result)
+        # result = cursor.fetchone()
+        if result:
+            return result
+        else:
+            return None
+    except Exception as e:
+        save_error(e)
+        return None
 
 
 def save_error(error, metadata=None):
@@ -95,11 +106,10 @@ def save_error(error, metadata=None):
     :param metadata:
     :return:
     """
-    with get_db_cursor() as cursor:
-        if cursor:
-            return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
-                             (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
-    return -1
-
-
-connect_to_db()
+    print(str(error))
+    # with get_db_cursor() as cursor:
+    #     if cursor:
+    #         print(str(error))
+            # return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
+            #                  (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
+    # return -1

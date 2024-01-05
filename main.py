@@ -65,6 +65,7 @@ class User(BaseModel):
     old_password: str = None
     hash_password: str = None
     api_key: str = None
+    active: bool = None
 
 
 class Conversation(BaseModel):
@@ -449,12 +450,15 @@ async def create_user(body: User):
             "code": 400,
         }
 
+
     # create hash for password
     hs_function = hashlib.md5()
+    hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
 
     try:
         result = add_user(body.name, body.email, password)
+
         if result == -1:
             return {
                 "response": "User already exists",
@@ -482,6 +486,8 @@ async def login_user(body: User):
 
     user = get_user_by_email(body.email)
 
+    print(user)
+
     if len(user) == 0:
         return {
             "response": "User not found",
@@ -495,6 +501,7 @@ async def login_user(body: User):
         }
 
     hs_function = hashlib.md5()
+    hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
 
     if user['password'] != password:
@@ -533,6 +540,7 @@ async def get_user(body: User):
 
 @app.post("/user/update_user_password")
 async def update_user_password(body: User):
+    # TODO: check fix it
     if check_api_key(body.api_key) is False:
         return {
             "response": "Invalid API Key",
@@ -542,8 +550,10 @@ async def update_user_password(body: User):
     user = get_user_by_id(body.user_id)
     psw = get_user_password(body.user_id)
     hs_function = hashlib.md5()
-    old_password = hs_function.hexdigest()
 
+    hs_function.update(body.old_password.encode('utf-8'))
+    old_password = hs_function.hexdigest()
+    hs_function.update(body.password.encode('utf-8'))
     new_password = hs_function.hexdigest()
 
     if psw != old_password:

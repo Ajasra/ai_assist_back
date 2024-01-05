@@ -1,137 +1,116 @@
-from cocroach_utils.database_utils import connect_to_db, save_error
+from cocroach_utils.database_utils import connect_to_db, save_error, get_db_cursor, fetch_all, fetch_one
 
 
 def get_all_assistants():
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM assistants")
-                rows = cur.fetchall()
-                return rows
-
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return []
-    else:
-        save_error("No connection to the database")
-        return []
+    """
+    Get all assistants
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_all(cursor, "SELECT * FROM assistants")
+    return []
 
 
 def get_assistant_by_id(assistant_id):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM assistants WHERE _id = %s",
-                    (assistant_id,))
-                row = cur.fetchone()
-                return row
-
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return None
-    else:
-        save_error("No connection to the database")
-        return None
+    """
+    Get assistant by id
+    :param assistant_id:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "SELECT * FROM assistants WHERE _id = %s", (assistant_id,))
+    return None
 
 
 def get_assistant_by_name(assistant_name):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM assistants WHERE title = %s",
-                    (assistant_name,))
-                row = cur.fetchone()
-                return row
-
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return None
-    else:
-        save_error("No connection to the database")
-        return None
+    """
+    Get assistant by name
+    :param assistant_name:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "SELECT * FROM assistants WHERE title = %s", (assistant_name,))
+    return None
 
 
 def get_assistant_by_user(user_id):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM assistants WHERE user = %s",
-                    (user_id,))
-                row = cur.fetchone()
-                return row
-
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return None
-    else:
-        save_error("No connection to the database")
-        return None
+    """
+    Get assistant by user
+    :param user_id:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "SELECT * FROM assistants WHERE user = %s", (user_id,))
+    return None
 
 
-def add_assistant(title, description ="", welcome_message = "", system_prompt = "", user = 0):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO assistants (title, description, welcome_msg, system_prompt, user) VALUES (%s, %s, %s, %s, %s)",
-                    (title, description, welcome_message, system_prompt, user))
-                conn.commit()
-                return cur.fetchone()[0]
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return -1
-    else:
-        save_error("No connection to the database")
-        return -1
+def add_assistant(title, description="", welcome_message="", system_prompt="", user=0):
+    """
+    Add assistant
+    :param title:
+    :param description:
+    :param welcome_message:
+    :param system_prompt:
+    :param user:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor,
+                             "INSERT INTO assistants (title, description, welcome_msg, system_prompt, user) VALUES (%s, %s, %s, %s, %s) RETURNING _id",
+                             (title, description, welcome_message, system_prompt, user))['_id']
+    return -1
 
 
-def update_assistant(title, description, welcome_message, system_prompt, user):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE assistants SET title = %s, description = %s, welcome_msg = %s, system_prompt = %s WHERE user = %s",
-                    (title, description, welcome_message, system_prompt, user))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
+def update_assistant(assistant_id, title, description, welcome_message, system_prompt, user):
+    """
+    Update assistant
+    :param assistant_id:
+    :param title:
+    :param description:
+    :param welcome_message:
+    :param system_prompt:
+    :param user:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            cursor.execute(
+                "UPDATE assistants SET title = %s, description = %s, welcome_msg = %s, system_prompt = %s, user = %s "
+                "WHERE _id = %s",
+                (title, description, welcome_message, system_prompt, user, assistant_id))
+            return cursor.rowcount == 1
+    return False
+
+
+def update_assistant_field(assistant_id, field, value):
+    """
+    Update assistant field
+    :param assistant_id:
+    :param field:
+    :param value:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            cursor.execute("UPDATE assistants SET " + field + " = %s WHERE _id = %s",
+                           (value, assistant_id))
+            return cursor.rowcount == 1
+    return False
 
 
 def delete_assistant(assistant_id):
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM assistants WHERE _id = %s",
-                    (assistant_id,))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
+    """
+    Delete assistant
+    :param assistant_id:
+    :return:
+    """
+    with get_db_cursor() as cursor:
+        if cursor:
+            cursor.execute("DELETE FROM assistants WHERE _id = %s", (assistant_id,))
+            return cursor.rowcount == 1
+    return False

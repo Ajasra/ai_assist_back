@@ -25,16 +25,18 @@ def get_model_by_name(model_name):
 def add_model(name, description="", price_in=0.0, price_out=0.0):
     with get_db_cursor() as cursor:
         if cursor:
-            return fetch_one(cursor, "INSERT INTO models (name, description, price_in, price_out) VALUES (%s, %s, %s, "
-                                     "%s)", (name, description, price_in, price_out))[0]
-    return -1
+            cursor.execute("INSERT INTO models (name, description, price_in, price_out) VALUES (%s, %s, %s, "
+                           "%s)", (name, description, price_in, price_out))
+            return cursor.rowcount == 1
+    return False
 
 
 def update_model(model_id, name, description="", price_in=0.0, price_out=0.0):
     with get_db_cursor() as cursor:
         if cursor:
-            return fetch_one(cursor, "UPDATE models SET name = %s, description = %s, price_in = %s, price_out = %s "
-                                     "WHERE _id = %s", (name, description, price_in, price_out, model_id))[0]
+            cursor.execute("UPDATE models SET name = %s, description = %s, price_in = %s, price_out = %s "
+                           "WHERE _id = %s", (name, description, price_in, price_out, model_id))
+            return cursor.rowcount == 1
     return False
 
 

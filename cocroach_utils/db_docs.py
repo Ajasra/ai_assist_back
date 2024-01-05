@@ -2,42 +2,19 @@
 import time
 import pandas as pd
 
-from cocroach_utils.database_utils import connect_to_db, save_error
+from cocroach_utils.database_utils import get_db_cursor, fetch_all, fetch_one
 
 
-# GET
 def get_user_docs(user_id):
     """
     Get all docs for the user
     :param user_id:
     :return:
     """
-    conn = connect_to_db()
-
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM documents WHERE user_id = %s AND active = true",
-                    (user_id,))
-                conn.commit()
-                docs = []
-                for doc in cur.fetchall():
-                    docs.append({
-                        "doc_id": str(doc[0]),
-                        "name": doc[1],
-                        "summary": doc[2],
-                        "user_id": str(doc[3]),
-                        "updated": doc[4]
-                    })
-                return docs
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return []
-    else:
-        save_error("No connection to the database")
-        return []
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_all(cursor, "SELECT * FROM documents WHERE user_id = %s AND active = true", (user_id,))
+    return []
 
 
 def get_doc_by_id(doc_id):
@@ -46,29 +23,10 @@ def get_doc_by_id(doc_id):
     :param doc_id:
     :return:
     """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM documents WHERE doc_id = %s",
-                    (doc_id,))
-                conn.commit()
-                doc = cur.fetchone()
-                return {
-                    "doc_id": str(doc[0]),
-                    "name": doc[1],
-                    "summary": doc[2],
-                    "user_id": str(doc[3]),
-                    "updated": doc[4]
-                }
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return []
-    else:
-        save_error("No connection to the database")
-        return []
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "SELECT * FROM documents WHERE doc_id = %s", (doc_id,))
+    return None
 
 
 def get_all_docs():
@@ -76,30 +34,10 @@ def get_all_docs():
     Get all docs
     :return:
     """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM documents")
-                conn.commit()
-                docs = []
-                for doc in cur.fetchall():
-                    docs.append({
-                        "doc_id": str(doc[0]),
-                        "name": doc[1],
-                        "summary": doc[2],
-                        "user_id": str(doc[3]),
-                        "updated": doc[4]
-                    })
-                return docs
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return []
-    else:
-        save_error("No connection to the database")
-        return []
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_all(cursor, "SELECT * FROM documents")
+    return []
 
 
 def get_doc_by_name(doc_name):
@@ -108,32 +46,12 @@ def get_doc_by_name(doc_name):
     :param doc_name:
     :return:
     """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT * FROM documents WHERE name = %s",
-                    (doc_name,))
-                conn.commit()
-                doc = cur.fetchone()
-                return {
-                    "doc_id": str(doc[0]),
-                    "name": doc[1],
-                    "summary": doc[2],
-                    "user_id": str(doc[3]),
-                    "updated": doc[4]
-                }
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return []
-    else:
-        save_error("No connection to the database")
-        return []
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "SELECT * FROM documents WHERE name = %s", (doc_name,))
+    return None
 
 
-# ADD
 def add_doc(user_id, doc_name, doc_text):
     """
     Add doc to the database and return the new doc_id
@@ -142,25 +60,14 @@ def add_doc(user_id, doc_name, doc_text):
     :param doc_text:
     :return: doc_id
     """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO documents (user_id, name, summary, updated) VALUES (%s, %s, %s, %s) RETURNING doc_id",
-                    (user_id, doc_name, doc_text, pd.Timestamp(time.time(), unit='s')))
-                conn.commit()
-                return cur.fetchone()[0]
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return -1
-    else:
-        save_error("No connection to the database")
-        return -1
+    with get_db_cursor() as cursor:
+        if cursor:
+            return fetch_one(cursor, "INSERT INTO documents (user_id, name, summary, updated) VALUES (%s, %s, %s, %s) "
+                                     "RETURNING doc_id",
+                             (user_id, doc_name, doc_text, pd.Timestamp(time.time(), unit='s')))['doc_id']
+    return -1
 
 
-# UPDATE
 def update_doc_field_by_id(doc_id, field, value):
     """
     Update doc fields
@@ -169,51 +76,22 @@ def update_doc_field_by_id(doc_id, field, value):
     :param value:
     :return:
     """
-    conn = connect_to_db()
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE documents SET " + field + " = %s, updated = %s WHERE doc_id = %s",
-                    (value, pd.Timestamp(time.time(), unit='s'), doc_id))
-                conn.commit()
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
+    with get_db_cursor() as cursor:
+        if cursor:
+            cursor.execute("UPDATE documents SET " + field + " = %s, updated = %s WHERE doc_id = %s",
+                           (value, pd.Timestamp(time.time(), unit='s'), doc_id))
+            return cursor.rowcount == 1
+    return False
 
 
-# DELETE
 def delete_doc_by_id(doc_id):
     """
     Delete doc from the database
     :param doc_id:
     :return:
     """
-    conn = connect_to_db()
-
-    print("delete_doc_by_id", doc_id)
-    if conn is not None:
-        try:
-            with conn.cursor() as cur:
-                # cur.execute(
-                #     "DELETE FROM documents WHERE doc_id = %s",
-                #     (doc_id,))
-                cur.execute(
-                    "UPDATE documents SET active = %s WHERE doc_id = %s",
-                    (False, doc_id))
-                conn.commit()
-                # delete folder and all files in it from the server './db/doc_id'
-                # shutil.rmtree('./db/' + str(doc_id))
-                return True
-        except Exception as err:
-            conn.rollback()
-            save_error(err)
-            return False
-    else:
-        save_error("No connection to the database")
-        return False
+    with get_db_cursor() as cursor:
+        if cursor:
+            cursor.execute("UPDATE documents SET active = %s WHERE doc_id = %s", (False, doc_id,))
+            return cursor.rowcount == 1
+    return False
