@@ -40,7 +40,7 @@ def get_selected_history(history_id):
     """
     with get_db_cursor() as cursor:
         if cursor:
-            return fetch_one(cursor, "SELECT * FROM history WHERE hist_id = %s", (history_id,))
+            return fetch_one(cursor, "SELECT * FROM history WHERE conv_id = %s", (history_id,))
     return []
 
 
@@ -60,14 +60,14 @@ def add_history(conv_id, prompt, answer, followup=None, feedback=0):
     with get_db_cursor() as cursor:
         if cursor:
             return fetch_one(cursor, "INSERT INTO history (conv_id, prompt, answer, feedback, time, followup) VALUES "
-                                     "(%s, %s, %s, %s, %s, %s) RETURNING hist_id",
-                             (conv_id, prompt, answer, feedback, pd.Timestamp(time.time(), unit='s'), followup))['hist_id']
+                                     "(%s, %s, %s, %s, %s, %s) RETURNING conv_id",
+                             (conv_id, prompt, answer, feedback, pd.Timestamp(time.time(), unit='s'), followup))['conv_id']
     return -1
 
 
 def update_history_field_by_id(history_id, field, value):
     """
-    Update history field by id
+    Update history field by conv_id
     :param history_id:
     :param field:
     :param value:
@@ -75,7 +75,7 @@ def update_history_field_by_id(history_id, field, value):
     """
     with get_db_cursor() as cursor:
         if cursor:
-            cursor.execute("UPDATE history SET " + field + " = %s WHERE hist_id = %s",
+            cursor.execute("UPDATE history SET " + field + " = %s WHERE conv_id = %s",
                            (value, history_id))
             return cursor.rowcount == 1
     return False
@@ -83,20 +83,20 @@ def update_history_field_by_id(history_id, field, value):
 
 def delete_history_by_id(history_id):
     """
-    Delete history by id
+    Delete history by conv_id
     :param history_id:
     :return:
     """
     with get_db_cursor() as cursor:
         if cursor:
-            cursor.execute("DELETE FROM history WHERE hist_id = %s", (history_id,))
+            cursor.execute("DELETE FROM history WHERE conv_id = %s", (history_id,))
             return cursor.rowcount == 1
     return False
 
 
 def delete_history_by_conv_id(conv_id):
     """
-    Delete history by conversation id
+    Delete history by conversation conv_id
     :param conv_id:
     :return:
     """

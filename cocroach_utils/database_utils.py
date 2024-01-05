@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import pandas as pd
 import psycopg2 as psycopg2
 from dotenv import load_dotenv
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 database_url = os.getenv("CR_DATABASE_URL")
@@ -18,21 +19,13 @@ def connect_to_db():
     """
     global conn
 
-    if conn is None:
+    if conn is None or conn.closed == 1:
         try:
             conn = psycopg2.connect(database_url)
-            return conn
         except Exception as e:
-            print(str(e))
-    else:
-        if conn.closed == 1:
-            print('Reconnecting to database')
-            try:
-                conn = psycopg2.connect(database_url)
-                return conn
-            except Exception as e:
-                print(str(e))
-        return conn
+            raise Exception("Failed to connect to the database: " + str(e))
+
+    return conn
 
 
 @contextmanager
@@ -44,17 +37,15 @@ def get_db_cursor():
     """
     connection = connect_to_db()
     if connection is None:
-        save_error("No connection to the database")
-        yield None
+        raise Exception("No connection to the database")
     else:
         try:
-            with connection.cursor() as cursor:
+            with connection.cursor(cursor_factory=RealDictCursor) as cursor:
                 yield cursor
             connection.commit()
         except Exception as err:
             connection.rollback()
-            save_error(err)
-            yield None
+            raise Exception("Failed to get cursor: " + str(err))
         finally:
             connection.close()
 
@@ -67,9 +58,19 @@ def fetch_all(cursor, query, params=None):
     :param params:
     :return:
     """
-    cursor.execute(query, params or ())
-    columns = [col[0] for col in cursor.description]
-    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+    try:
+        cursor.execute(query, params or ())
+        result = cursor.fetchall()
+
+        if result is None:
+            return []
+
+        result = [{k: str(v) for k, v in row.items()} for row in result]
+        return result
+
+    except Exception as e:
+        save_error(e, cursor)
+        return []
 
 
 def fetch_one(cursor, query, params):
@@ -82,34 +83,35 @@ def fetch_one(cursor, query, params):
     """
     try:
         cursor.execute(query, params)
-        if cursor.rowcount == 0:
-            print("No results found")
-            return None
-        # i want to fetch one row in dict format (column name: value)
-        columns = [col[0] for col in cursor.description]
-        result = dict(zip(columns, cursor.fetchone()))
-        print(result)
-        # result = cursor.fetchone()
-        if result:
-            return result
-        else:
-            return None
+        result = cursor.fetchone()
+        if result is None:
+            return []
+        result = {k: str(v) for k, v in result.items()}
+        return result
+
     except Exception as e:
-        save_error(e)
+        save_error(e, cursor)
         return None
 
 
-def save_error(error, metadata=None):
+def save_error(error, metadata=None, cursor=None):
     """
     Save an error to the database
+    :param cursor:
     :param error:
     :param metadata:
     :return:
     """
+
     print(str(error))
-    # with get_db_cursor() as cursor:
+
+    # if cursor is None:
+    #     with get_db_cursor() as cursor:
+    #         if cursor:
+    #             return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
+    #                              (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
+    # else:
     #     if cursor:
-    #         print(str(error))
-            # return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
-            #                  (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
-    # return -1
+    #         return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
+    #                          (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
+    return -1

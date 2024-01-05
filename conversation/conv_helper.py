@@ -11,7 +11,7 @@ load_dotenv()
 
 def get_conv_id(conv_id):
     """
-    Get the conversation id and return a new one if it does not exist
+    Get the conversation conv_id and return a new one if it does not exist
     :param conv_id:
     :return:
     """
@@ -63,7 +63,6 @@ def format_response(response_input):
     :param response_input:
     :return:
     """
-    print("Response input: ", response_input)
     data = []
     # check if there are follow up questions regardless of uppercase or lowercase
     if "FOLLOW UP QUESTIONS:" in response_input:
@@ -88,8 +87,8 @@ def format_response(response_input):
         data = response_input.split("follow-up:")
 
     if len(data) > 1:
-        answer = data[0].strip().replace("ANSWER:", "")
-        answer = data[0].strip().replace("answer:", "")
+        # answer = data[0].strip().replace("ANSWER:", "")
+        # answer = data[0].strip().replace("answer:", "")
         answer = data[0].strip().replace("Answer:", "")
         follow_up_questions = data[1].strip().split("\n")
         if len(follow_up_questions) == 1:

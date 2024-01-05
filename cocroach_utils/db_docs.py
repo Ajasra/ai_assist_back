@@ -19,7 +19,7 @@ def get_user_docs(user_id):
 
 def get_doc_by_id(doc_id):
     """
-    Get doc by id
+    Get doc by conv_id
     :param doc_id:
     :return:
     """

@@ -1,18 +1,21 @@
 import hashlib
-import os.path
 from dotenv import load_dotenv
 
-from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 
-from cocroach_utils.db_models import get_all_models, get_model_by_id
-from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, get_user_password
+from cocroach_utils.db_assistants import get_all_assistants, get_assistant_by_id, update_assistant, add_assistant, \
+    delete_assistant, update_assistant_field
+from cocroach_utils.db_models import get_all_models, get_model_by_id, update_model, add_model, delete_model
+from cocroach_utils.db_users import add_user, get_user_by_email, get_user_by_id, update_user, \
+    update_user_field
 from cocroach_utils.db_history import get_history_for_conv, update_history_field_by_id, delete_history_by_id
 from cocroach_utils.db_conv import get_user_conversations, get_conv_by_id, \
     delete_conversation, \
     add_conversation, update_conversation_field
-from cocroach_utils.db_docs import get_user_docs, get_all_docs, delete_doc_by_id
+from cocroach_utils.db_docs import get_user_docs, get_all_docs, delete_doc_by_id, get_doc_by_id, update_doc_field_by_id
+from models import ConvRequest, User, Conversation, History, Document, Model, Assistant
+from utils.return_api import check_api_key, wrong_api, check_result, return_error, return_success
 from vectordb.vectordb import create_vector_index
 from conversation.conv import get_response_over_doc, get_simple_response, get_doc_summary
 
@@ -40,85 +43,9 @@ app.add_middleware(
     allow_origins=origins,
     # allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
-
-# default values for start
-usr_id = 0
-
-
-class ConvRequest(BaseModel):
-    user_message: str
-    conversation_id: int = None
-    user_id: int = None
-    document: int = None
-    memory: int = 10
-    api_key: str = None
-
-
-class User(BaseModel):
-    user_id: int = 0
-    name: str = None
-    email: str = None
-    password: str = None
-    old_password: str = None
-    hash_password: str = None
-    api_key: str = None
-    active: bool = None
-
-
-class Conversation(BaseModel):
-    conv_id: int = 0
-    limit: int = 10
-    title: str = None
-    user_id: int = None
-    doc_id: int = None
-    active: bool = None
-    summary: str = None
-    api_key: str = None
-    model: str = None
-    assistant: str = None
-
-
-class DocRequest(BaseModel):
-    file: UploadFile = File(...)
-    user_id: int = Form(...)
-    force: bool = Form(...)
-
-
-class EmptyRequest(BaseModel):
-    api_key: str = None
-
-
-class Model(BaseModel):
-    api_key: str = None
-    model_id: int = 0
-    model_name: str = ""
-    model_description: str = ""
-    model_price_in: float = 0
-    model_price_out: float = 0
-
-
-class Document(BaseModel):
-    doc_id: int = None
-    api_key: str = None
-
-
-class History(BaseModel):
-    hist_id: int = None
-    feedback: int = 0
-    api_key: str = None
-
-
-def check_api_key(api_key):
-    print(api_key)
-    print(os.getenv("PUBLIC_API_KEY"))
-    if api_key is None:
-        return False
-    if api_key == os.getenv("PUBLIC_API_KEY"):
-        return True
-    return False
 
 
 @app.get("/")
@@ -126,480 +53,375 @@ def read_root():
     return {"Page not found"}
 
 
-# CONVERSATIONS
-@app.post("/conv/get_response")
-async def get_response(body: ConvRequest):
+# RESPONSE ENDPOINTS
+@app.post("/response/simple")
+async def api_get_simple_response(body: ConvRequest):
     """
     :param body:
     :return:
     """
-
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     resp = get_simple_response(body.user_message, body.conversation_id, body.user_id, body.memory)
-
-    return {
-        "response": resp,
-        "debug": debug,
-        "code": 200
-    }
+    return check_result(resp, 400, "No response")
 
 
-@app.post("/conv/get_response_doc")
-async def get_response(body: ConvRequest):
+@app.post("/response/doc")
+async def api_get_doc_response(body: ConvRequest):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     resp = get_response_over_doc(body.user_message, body.conversation_id, body.document, body.user_id, body.memory)
-
-    return {
-        "response": resp,
-        "debug": debug,
-        "code": 200
-    }
+    return check_result(resp, 400, "No response")
 
 
-@app.post("/conv/get_user_conversations")
-async def get_user_conversation(body: User):
+
+# CONVERSATIONS ENDPOINTS
+@app.post("/conv/get")
+async def api_get_conversation(body: Conversation):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    result = get_user_conversations(body.user_id)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-@app.post("/conv/get_selected_conv")
-async def get_selected_conv(body: Conversation):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    result = get_conv_by_id(body.conv_id)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-# HISTORY
-@app.post("/conv/get_history")
-async def get_history(body: Conversation):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    result = get_history_for_conv(body.conv_id, body.limit)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-@app.post("history/delete")
-async def delete_history(body: History):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    result = delete_history_by_id(body.hist_id)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-@app.post("/conv/create")
-async def create_conv(body: Conversation):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    if body.user_id is None:
-        return {
-            "response": "User ID is required",
-            "code": 400,
-        }
-
-    if body.title is None:
-        return {
-            "response": "Title is required",
-            "code": 400,
-        }
-
-    result = add_conversation(body.user_id, body.doc_id, body.title)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-@app.post("/conv/history/feedback")
-async def history_feedback(body: History):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    if body.hist_id is None:
-        return {
-            "response": "History ID is required",
-            "code": 400,
-        }
-
-    result = update_history_field_by_id(body.hist_id, 'feedback', body.feedback)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
-
-
-@app.post("/conv/update")
-async def update_conv_title(body: Conversation):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    if body.title is not None:
-        result = update_conversation_field(body.conv_id, 'title', body.title)
-    elif body.active is not None:
-        result = update_conversation_field(body.conv_id, 'active', body.active)
-    elif body.summary is not None:
-        result = update_conversation_field(body.conv_id, 'summary', body.summary)
-    elif body.model is not None:
-        result = update_conversation_field(body.conv_id, 'model', body.model)
-    elif body.assistant is not None:
-        result = update_conversation_field(body.conv_id, 'assistant', body.assistant)
+        return wrong_api()
+    if body.conv_id is not None:
+        result = get_conv_by_id(body.conv_id)
+    elif body.user_id is not None:
+        result = get_user_conversations(body.user_id)
     else:
-        return {
-            "response": "No data to update",
-            "code": 400,
-        }
+        return return_error(400, "conv_id or user_id is required")
+    return check_result(result, 400, "Conversation do not exist")
 
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
+
+@app.post("/conv/add")
+async def api_add_conversation(body: Conversation):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.user_id is None:
+        return return_error(400, "User conv_id is required")
+    if body.title is None:
+        return return_error(400, "Title is required")
+    result = add_conversation(body.user_id, body.doc_id, body.title)
+    return check_result(result, 400, "Cant create conversation")
+
+
+@app.post("/conv/update_field")
+async def api_update_conv(body: Conversation):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.conv_id is None:
+        return return_error(400, "Conversation conv_id is required")
+    if body.field is None:
+        return return_error(400, "Conversation field is required")
+    if body.value is None:
+        return return_error(400, "Conversation value is required")
+    result = update_conversation_field(body.conv_id, body.field, body.value)
+    return check_result(result, 400, "Cant update conversation")
 
 
 @app.post("/conv/delete")
-async def delete_conv(body: Conversation):
+async def api_delete_conv(body: Conversation):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     result = delete_conversation(body.conv_id)
-
-    return {
-        "response": result,
-        "debug": debug,
-        "code": 200,
-    }
+    return check_result(result, 400, "Cant delete conversation")
 
 
-# DOCS
-@app.post("/docs/get_docs/user_id")
-async def get_indexes(body: User):
+# HISTORY ENDPOINTS
+@app.post("/history/get")
+async def api_get_history(body: Conversation):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    try:
-        if body.user_id == 0:
-            docs = get_all_docs()
-        else:
-            docs = get_user_docs(body.user_id)
-    except Exception as e:
-        return {
-            "response": "Cant get docs",
-            "message": str(e),
-            "code": 400,
-        }
-
-    return {
-        "response": docs,
-        "debug": debug,
-        "code": 200,
-    }
+        return wrong_api()
+    result = get_history_for_conv(body.conv_id, body.limit)
+    return check_result(result, 400, "No history")
 
 
-@app.post("/docs/uploadfile/")
-async def create_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...),
+@app.post("history/delete")
+async def api_delete_history(body: History):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    result = delete_history_by_id(body.hist_id)
+    return check_result(result, 400, "Cant delete")
+
+
+@app.post("/history/update_field")
+async def api_history_update_field(body: History):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.hist_id is None:
+        return return_error(400, "History conv_id is required")
+    if body.field is None:
+        return return_error(400, "History field is required")
+    if body.value is None:
+        return return_error(400, "History value is required")
+    result = update_history_field_by_id(body.hist_id, body.field, body.value)
+    return check_result(result, 400, "Cant update history")
+
+
+# DOCS ENDPOINTS
+@app.post("/docs/get")
+async def api_get_docs(body: Document):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.doc_id is not None:
+        result = get_doc_by_id(body.doc_id)
+    elif body.user_id is not None:
+        result = get_user_docs(body.user_id)
+    else:
+        result = get_all_docs()
+    return check_result(result, 400, "No docs")
+
+
+@app.post("/docs/add")
+async def api_upload_file(file: UploadFile = File(...), user_id: int = Form(...), force: bool = Form(...),
                              api_key: str = Form(...)):
     if check_api_key(api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
+        return wrong_api()
 
     try:
         res = create_vector_index(file, user_id, force)
-        print('Uploading')
-
         if res['status'] == 'success':
             summary = get_doc_summary(file, str(res['data']['doc_id']))
-
+            # TODO: make it as a common format for all return results
             return {
                 "result": res,
                 "summary": summary,
                 "code": 200,
             }
-
         else:
-            return {
-                "result": res,
-                "code": 400,
-            }
+            return return_success(res)
     except Exception as e:
-        return {
-            "result": str(e),
-            "code": 400,
-        }
+        return return_error(400, str(e))
+
+
+@app.post("/docs/update_field")
+async def api_update_doc_field(body: Document):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.doc_id is None:
+        return return_error(400, "Doc conv_id is required")
+    if body.field is None:
+        return return_error(400, "Doc field is required")
+    if body.value is None:
+        return return_error(400, "Doc value is required")
+    result = update_doc_field_by_id(body.doc_id, body.field, body.value)
+    return check_result(result, 400, "Cant update doc")
 
 
 @app.post("/docs/delete")
-async def delete_doc(body: Document):
+async def api_delete_doc(body: Document):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     if body.doc_id is not None:
-        try:
-            res = delete_doc_by_id(body.doc_id)
-
-            return {
-                "result": res,
-                "code": 200,
-            }
-        except Exception as e:
-            return {
-                "result": str(e),
-                "code": 400,
-            }
+        result = delete_doc_by_id(body.doc_id)
+        return check_result(result, 400, "Cant delete doc")
     else:
-        return {
-            "result": "doc_id is required",
-            "code": 400,
-        }
+        return return_error(400, "doc_id is required")
 
 
-# USERS
-@app.post("/user/create")
-async def create_user(body: User):
-    if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    if body.name is None:
-        return {
-            "response": "Name is required",
-            "code": 400,
-        }
-    if body.email is None:
-        return {
-            "response": "Email is required",
-            "code": 400,
-        }
-    if body.password is None:
-        return {
-            "response": "Password is required",
-            "code": 400,
-        }
-
-
-    # create hash for password
-    hs_function = hashlib.md5()
-    hs_function.update(body.password.encode('utf-8'))
-    password = hs_function.hexdigest()
-
-    try:
-        result = add_user(body.name, body.email, password)
-
-        if result == -1:
-            return {
-                "response": "User already exists",
-                "code": 400,
-            }
-    except Exception as e:
-        return {
-            "response": str(e),
-            "code": 400,
-        }
-
-    return {
-        "user_id": result,
-        "code": 200,
-    }
-
-
+# USERS ENDPOINTS
 @app.post("/user/login")
-async def login_user(body: User):
+async def api_login_user(body: User):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     user = get_user_by_email(body.email)
 
-    print(user)
-
     if len(user) == 0:
-        return {
-            "response": "User not found",
-            "code": 400,
-        }
+        return return_error(400, "User not found")
 
     if user['active'] == 0:
-        return {
-            "response": "User is not active",
-            "code": 400,
-        }
+        return return_error(400, "User is not active")
 
     hs_function = hashlib.md5()
     hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
 
     if user['password'] != password:
-        return {
-            "response": "Wrong password",
-            "code": 400,
-        }
-
-    return {
-        "data": {
-            "user_id": user['user_id'],
-            "name": user['name'],
-            "email": user['email'],
-            "password": user['password'],
-            "role": user['role']
-        },
-        "code": 200,
-    }
+        return return_error(400, "Wrong password")
+    return check_result(user, 400, "User not found")
 
 
-@app.post("/user/get_user")
-async def get_user(body: User):
+@app.post("/user/get")
+async def api_get_user(body: User):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
+        return wrong_api()
     user = get_user_by_id(body.user_id)
-
-    return {
-        "data": user,
-        "code": 200,
-    }
+    return check_result(user, 400, "User not found")
 
 
-@app.post("/user/update_user_password")
-async def update_user_password(body: User):
-    # TODO: check fix it
+@app.post("/user/update")
+async def api_update_user(body: User):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
+        return wrong_api()
+    if body.user_id is None:
+        return return_error(400, "User conv_id is required")
+    if body.name is None:
+        return return_error(400, "User name is required")
+    if body.email is None:
+        return return_error(400, "User email is required")
+    result = update_user(body.user_id, body.name, body.email, body.password)
+    return check_result(result, 400, "Cant update user")
 
-    user = get_user_by_id(body.user_id)
-    psw = get_user_password(body.user_id)
+
+@app.post("/user/update_field")
+async def api_update_user_field(body: User):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.user_id is None:
+        return return_error(400, "User conv_id is required")
+    if body.field is None:
+        return return_error(400, "User field is required")
+    if body.value is None:
+        return return_error(400, "User value is required")
+
+    if body.field == 'password':
+        # if we need to update user password
+        user = get_user_by_id(body.user_id)
+        psw = user['password']
+        hs_function = hashlib.md5()
+        hs_function.update(body.old_password.encode('utf-8'))
+        old_password = hs_function.hexdigest()
+        hs_function.update(body.value.encode('utf-8'))
+        new_password = hs_function.hexdigest()
+
+        if psw != old_password:
+            return return_error(400, "Wrong password")
+        result = update_user_field(body.user_id, 'password', new_password)
+        return check_result(result, 400, "Cant update user")
+
+    result = update_user_field(body.user_id, body.field, body.value)
+    return check_result(result, 400, "Cant update user")
+
+
+@app.post("/user/add")
+async def api_add_user(body: User):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+
+    if body.name is None:
+        return return_error(400, "Name is required")
+    if body.email is None:
+        return return_error(400, "Email is required")
+    if body.password is None:
+        return return_error(400, "Password is required")
+
     hs_function = hashlib.md5()
-
-    hs_function.update(body.old_password.encode('utf-8'))
-    old_password = hs_function.hexdigest()
     hs_function.update(body.password.encode('utf-8'))
-    new_password = hs_function.hexdigest()
+    password = hs_function.hexdigest()
 
-    if psw != old_password:
-        return {
-            "response": "Wrong password",
-            "code": 400,
-        }
-
-    result = update_user(body.user_id, user['name'], user['email'], new_password)
-
-    return {
-        "status": "success",
-        "data": result,
-        "code": 200,
-    }
+    result = add_user(body.name, body.email, password)
+    return check_result(result, 400, "Cant create user")
 
 
-@app.post("/models/get_models")
-async def get_models(body: Model):
+@app.post("/user/delete")
+async def api_delete_user(body: User):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
-
-    models = get_all_models()
-
-    return {
-        "status": "success",
-        "response": models,
-        "code": 200,
-    }
+        return wrong_api()
+    if body.user_id is None:
+        return return_error(400, "User conv_id is required")
+    result = update_user_field(body.user_id, 'active', 0)
+    return check_result(result, 400, "Cant delete user")
 
 
-@app.post("/models/get_model_by_id")
-async def get_model_id(body: Model):
+# MODELS ENDPOINTS
+@app.post("/models/get")
+async def api_get_model(body: Model):
     if check_api_key(body.api_key) is False:
-        return {
-            "response": "Invalid API Key",
-            "code": 400,
-        }
+        return wrong_api()
+    if body.model_id is not None:
+        result = get_model_by_id(body.model_id)
+    else:
+        result = get_all_models()
+    return check_result(result, 400, "No models")
 
-    model = get_model_by_id(body.model_id)
 
-    return {
-        "status": "success",
-        "response": model,
-        "code": 200,
-    }
+@app.post("/models/update")
+async def api_update_model(body: Model):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.model_id is None:
+        return return_error(400, "Model conv_id is required")
+    if body.name is None:
+        return return_error(400, "Model name is required")
+    if body.description is None:
+        return return_error(400, "Model description is required")
+    if body.price_in is None:
+        return return_error(400, "Model price_in is required")
+    if body.price_out is None:
+        return return_error(400, "Model price_out is required")
+    result = update_model(body.model_id, body.name, body.description, body.price_in, body.price_out)
+    return check_result(result, 400, "Cant update model")
+
+@app.post("/models/add")
+async def api_add_model(body: Model):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.name is None:
+        return return_error(400, "Model name is required")
+    result = add_model(body.name, body.description, body.price_in, body.price_out)
+    return check_result(result, 400, "Cant add model")
+
+
+@app.post("/models/delete")
+async def api_delete_model(body: Model):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.model_id is None:
+        return return_error(400, "Model conv_id is required")
+    result = delete_model(body.model_id)
+    return check_result(result, 400, "Cant delete model")
+
+
+# ASSISTANTS ENDPOINTS
+@app.post("/assistant/get")
+async def api_get_assistant(body: Assistant):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.assist_id is not None:
+        result = get_assistant_by_id(body.assist_id)
+    else:
+        result = get_all_assistants()
+    return check_result(result, 400, "No assistants")
+
+
+@app.post("/assistant/update")
+async def api_update_assistant(body: Assistant):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.assist_id is None:
+        return return_error(400, "Assistant conv_id is required")
+    if body.name is None:
+        return return_error(400, "Assistant name is required")
+
+    result = update_assistant(body.assist_id, body.name, body.description, body.welcome, body.prompt, body.user)
+    return check_result(result, 400, "Cant update assistant")
+
+
+@app.post("/assistant/update_field")
+async def api_update_assistant_field(body: Assistant):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.assist_id is None:
+        return return_error(400, "Assistant conv_id is required")
+    if body.field is None:
+        return return_error(400, "Assistant field is required")
+    if body.value is None:
+        return return_error(400, "Assistant value is required")
+    result = update_assistant_field(body.assist_id, body.field, body.value)
+    return check_result(result, 400, "Cant update assistant")
+
+
+@app.post("/assistant/add")
+async def api_add_assistant(body: Assistant):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.name is None:
+        return return_error(400, "Assistant name is required")
+    result = add_assistant(body.name, body.description, body.welcome, body.prompt, body.user)
+    return check_result(result, 400, "Cant add assistant")
+
+
+@app.post("/assistant/delete")
+async def api_delete_assistant(body: Assistant):
+    if check_api_key(body.api_key) is False:
+        return wrong_api()
+    if body.assist_id is None:
+        return return_error(400, "Assistant conv_id is required")
+    result = delete_assistant(body.assist_id)
+    return check_result(result, 400, "Cant delete assistant")

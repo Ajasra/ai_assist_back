@@ -37,7 +37,7 @@ def create_index(filename):
         documents, service_context=service_context
     )
     print("Index created")
-    print("Index id: {}".format(index.index_id))
+    print("Index conv_id: {}".format(index.index_id))
     print(index.docstore)
 
     if not os.path.exists("./persist/"+filename):

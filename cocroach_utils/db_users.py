@@ -2,38 +2,15 @@
 from cocroach_utils.database_utils import get_db_cursor, fetch_all, fetch_one
 
 
-def get_all_models():
-    """
-    Get all models
-    :return:
-    """
-    with get_db_cursor() as cursor:
-        if cursor:
-            return fetch_all(cursor, "SELECT * FROM models")
-    return []
-
-
 def get_user_by_id(user_id):
     """
-    Get user by id
+    Get user by conv_id
     :param user_id:
     :return:
     """
     with get_db_cursor() as cursor:
         if cursor:
             return fetch_one(cursor, "SELECT * FROM users WHERE user_id = %s", (user_id,))
-    return None
-
-
-def get_user_password(user_id):
-    """
-    Get user password by id
-    :param user_id:
-    :return:
-    """
-    with get_db_cursor() as cursor:
-        if cursor:
-            return fetch_one(cursor, "SELECT password FROM users WHERE user_id = %s", (user_id,))['password']
     return None
 
 
@@ -46,18 +23,6 @@ def get_user_by_email(email):
     with get_db_cursor() as cursor:
         if cursor:
             return fetch_one(cursor, "SELECT * FROM users WHERE email = %s", (email,))
-    return None
-
-
-def get_user_by_username(username):
-    """
-    Get user by username
-    :param username:
-    :return:
-    """
-    with get_db_cursor() as cursor:
-        if cursor:
-            return fetch_one(cursor, "SELECT * FROM users WHERE name = %s", (username,))
     return None
 
 
@@ -80,7 +45,7 @@ def get_user_tokens(user_id):
     """
     with get_db_cursor() as cursor:
         if cursor:
-            return fetch_one(cursor, "SELECT tokens_used FROM users WHERE user_id = %s", (user_id,))['tokens_used']
+            return str(fetch_one(cursor, "SELECT tokens_used FROM users WHERE user_id = %s", (user_id,))['tokens_used'])
     return None
 
 
@@ -92,13 +57,14 @@ def add_user(username, email, password):
     :param password:
     :return:
     """
+    # TODO: fix error when user already exist
     with get_db_cursor() as cursor:
         if cursor:
             result = fetch_one(cursor, "INSERT INTO users (name, email, password) "
-                                     " VALUES (%s, %s, %s)"
-                                     " RETURNING user_id", (username, email, password))
+                                       " VALUES (%s, %s, %s)"
+                                       " RETURNING user_id", (username, email, password))
             if result:
-                return result['user_id']
+                return str(result['user_id'])
             else:
                 return -1
     return -1

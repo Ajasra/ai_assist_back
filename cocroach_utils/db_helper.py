@@ -11,7 +11,7 @@ def DocumentsToStr(documents):
     for i in range(len(documents)):
 
         source = documents[i].page_content
-        # clean the source from specisl characters to allow it write in SQL database
+        # clean the source from special characters to allow it write in SQL database
         source = source.replace("'", "''")
         source = source.replace('"', '""')
 
