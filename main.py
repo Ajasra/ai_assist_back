@@ -62,16 +62,22 @@ async def api_get_simple_response(body: ConvRequest):
     """
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    resp = get_simple_response(body.user_message, body.conversation_id, body.user_id, body.memory)
-    return check_result(resp, 400, "No response")
+    try:
+        result = get_simple_response(body.user_message, body.conversation_id, body.user_id, body.memory)
+        return check_result(result, 400, "No response")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/response/doc")
 async def api_get_doc_response(body: ConvRequest):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    resp = get_response_over_doc(body.user_message, body.conversation_id, body.document, body.user_id, body.memory)
-    return check_result(resp, 400, "No response")
+    try:
+        result = get_response_over_doc(body.user_message, body.conversation_id, body.document, body.user_id, body.memory)
+        return check_result(result, 400, "No response")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 
@@ -80,13 +86,16 @@ async def api_get_doc_response(body: ConvRequest):
 async def api_get_conversation(body: Conversation):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    if body.conv_id is not None:
-        result = get_conv_by_id(body.conv_id)
-    elif body.user_id is not None:
-        result = get_user_conversations(body.user_id)
-    else:
-        return return_error(400, "conv_id or user_id is required")
-    return check_result(result, 400, "Conversation do not exist")
+    try:
+        if body.conv_id is not None:
+            result = get_conv_by_id(body.conv_id)
+        elif body.user_id is not None:
+            result = get_user_conversations(body.user_id)
+        else:
+            return return_error(400, "conv_id or user_id is required")
+        return check_result(result, 400, "Conversation do not exist")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/conv/add")
@@ -97,8 +106,11 @@ async def api_add_conversation(body: Conversation):
         return return_error(400, "User conv_id is required")
     if body.title is None:
         return return_error(400, "Title is required")
-    result = add_conversation(body.user_id, body.doc_id, body.title)
-    return check_result(result, 400, "Cant create conversation")
+    try:
+        result = add_conversation(body.user_id, body.doc_id, body.title)
+        return check_result(result, 400, "Cant create conversation")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/conv/update_field")
@@ -111,16 +123,22 @@ async def api_update_conv(body: Conversation):
         return return_error(400, "Conversation field is required")
     if body.value is None:
         return return_error(400, "Conversation value is required")
-    result = update_conversation_field(body.conv_id, body.field, body.value)
-    return check_result(result, 400, "Cant update conversation")
+    try:
+        result = update_conversation_field(body.conv_id, body.field, body.value)
+        return check_result(result, 400, "Cant update conversation")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/conv/delete")
 async def api_delete_conv(body: Conversation):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    result = delete_conversation(body.conv_id)
-    return check_result(result, 400, "Cant delete conversation")
+    try:
+        result = delete_conversation(body.conv_id)
+        return check_result(result, 400, "Cant delete conversation")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 # HISTORY ENDPOINTS
@@ -128,16 +146,22 @@ async def api_delete_conv(body: Conversation):
 async def api_get_history(body: Conversation):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    result = get_history_for_conv(body.conv_id, body.limit)
-    return check_result(result, 400, "No history")
+    try:
+        result = get_history_for_conv(body.conv_id, body.limit)
+        return check_result(result, 400, "No history")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("history/delete")
 async def api_delete_history(body: History):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    result = delete_history_by_id(body.hist_id)
-    return check_result(result, 400, "Cant delete")
+    try:
+        result = delete_history_by_id(body.hist_id)
+        return check_result(result, 400, "Cant delete")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/history/update_field")
@@ -150,8 +174,11 @@ async def api_history_update_field(body: History):
         return return_error(400, "History field is required")
     if body.value is None:
         return return_error(400, "History value is required")
-    result = update_history_field_by_id(body.hist_id, body.field, body.value)
-    return check_result(result, 400, "Cant update history")
+    try:
+        result = update_history_field_by_id(body.hist_id, body.field, body.value)
+        return check_result(result, 400, "Cant update history")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 # DOCS ENDPOINTS
@@ -159,13 +186,16 @@ async def api_history_update_field(body: History):
 async def api_get_docs(body: Document):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    if body.doc_id is not None:
-        result = get_doc_by_id(body.doc_id)
-    elif body.user_id is not None:
-        result = get_user_docs(body.user_id)
-    else:
-        result = get_all_docs()
-    return check_result(result, 400, "No docs")
+    try:
+        if body.doc_id is not None:
+            result = get_doc_by_id(body.doc_id)
+        elif body.user_id is not None:
+            result = get_user_docs(body.user_id)
+        else:
+            result = get_all_docs()
+        return check_result(result, 400, "No docs")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/docs/add")
@@ -200,19 +230,25 @@ async def api_update_doc_field(body: Document):
         return return_error(400, "Doc field is required")
     if body.value is None:
         return return_error(400, "Doc value is required")
-    result = update_doc_field_by_id(body.doc_id, body.field, body.value)
-    return check_result(result, 400, "Cant update doc")
+    try:
+        result = update_doc_field_by_id(body.doc_id, body.field, body.value)
+        return check_result(result, 400, "Cant update doc")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/docs/delete")
 async def api_delete_doc(body: Document):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    if body.doc_id is not None:
+    if body.doc_id is None:
+        return return_error(400, "doc_id is required")
+    try:
         result = delete_doc_by_id(body.doc_id)
         return check_result(result, 400, "Cant delete doc")
-    else:
-        return return_error(400, "doc_id is required")
+    except Exception as e:
+        return return_error(400, str(e))
+
 
 
 # USERS ENDPOINTS
@@ -220,29 +256,33 @@ async def api_delete_doc(body: Document):
 async def api_login_user(body: User):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    user = get_user_by_email(body.email)
+    try:
+        user = get_user_by_email(body.email)
+        if len(user) == 0:
+            return return_error(400, "User not found")
 
-    if len(user) == 0:
-        return return_error(400, "User not found")
+        if user['active'] == 0:
+            return return_error(400, "User is not active")
+        hs_function = hashlib.md5()
+        hs_function.update(body.password.encode('utf-8'))
+        password = hs_function.hexdigest()
 
-    if user['active'] == 0:
-        return return_error(400, "User is not active")
-
-    hs_function = hashlib.md5()
-    hs_function.update(body.password.encode('utf-8'))
-    password = hs_function.hexdigest()
-
-    if user['password'] != password:
-        return return_error(400, "Wrong password")
-    return check_result(user, 400, "User not found")
+        if user['password'] != password:
+            return return_error(400, "Wrong password")
+        return check_result(user, 400, "User not found")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/user/get")
 async def api_get_user(body: User):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    user = get_user_by_id(body.user_id)
-    return check_result(user, 400, "User not found")
+    try:
+        user = get_user_by_id(body.user_id)
+        return check_result(user, 400, "User not found")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/user/update")
@@ -255,8 +295,11 @@ async def api_update_user(body: User):
         return return_error(400, "User name is required")
     if body.email is None:
         return return_error(400, "User email is required")
-    result = update_user(body.user_id, body.name, body.email, body.password)
-    return check_result(result, 400, "Cant update user")
+    try:
+        result = update_user(body.user_id, body.name, body.email, body.password)
+        return check_result(result, 400, "Cant update user")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/user/update_field")
@@ -282,31 +325,37 @@ async def api_update_user_field(body: User):
 
         if psw != old_password:
             return return_error(400, "Wrong password")
-        result = update_user_field(body.user_id, 'password', new_password)
-        return check_result(result, 400, "Cant update user")
+        try:
+            result = update_user_field(body.user_id, 'password', new_password)
+            return check_result(result, 400, "Cant update user")
+        except Exception as e:
+            return return_error(400, str(e))
 
-    result = update_user_field(body.user_id, body.field, body.value)
-    return check_result(result, 400, "Cant update user")
+    try:
+        result = update_user_field(body.user_id, body.field, body.value)
+        return check_result(result, 400, "Cant update user")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/user/add")
 async def api_add_user(body: User):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-
     if body.name is None:
         return return_error(400, "Name is required")
     if body.email is None:
         return return_error(400, "Email is required")
     if body.password is None:
         return return_error(400, "Password is required")
-
     hs_function = hashlib.md5()
     hs_function.update(body.password.encode('utf-8'))
     password = hs_function.hexdigest()
-
-    result = add_user(body.name, body.email, password)
-    return check_result(result, 400, "Cant create user")
+    try:
+        result = add_user(body.name, body.email, password)
+        return check_result(result, 400, "Cant create user")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/user/delete")
@@ -315,8 +364,11 @@ async def api_delete_user(body: User):
         return wrong_api()
     if body.user_id is None:
         return return_error(400, "User conv_id is required")
-    result = update_user_field(body.user_id, 'active', 0)
-    return check_result(result, 400, "Cant delete user")
+    try:
+        result = update_user_field(body.user_id, 'active', 0)
+        return check_result(result, 400, "Cant delete user")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 # MODELS ENDPOINTS
@@ -324,11 +376,14 @@ async def api_delete_user(body: User):
 async def api_get_model(body: Model):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    if body.model_id is not None:
-        result = get_model_by_id(body.model_id)
-    else:
-        result = get_all_models()
-    return check_result(result, 400, "No models")
+    try:
+        if body.model_id is not None:
+            result = get_model_by_id(body.model_id)
+        else:
+            result = get_all_models()
+        return check_result(result, 400, "No models")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/models/update")
@@ -345,8 +400,11 @@ async def api_update_model(body: Model):
         return return_error(400, "Model price_in is required")
     if body.price_out is None:
         return return_error(400, "Model price_out is required")
-    result = update_model(body.model_id, body.name, body.description, body.price_in, body.price_out)
-    return check_result(result, 400, "Cant update model")
+    try:
+        result = update_model(body.model_id, body.name, body.description, body.price_in, body.price_out)
+        return check_result(result, 400, "Cant update model")
+    except Exception as e:
+        return return_error(400, str(e))
 
 @app.post("/models/add")
 async def api_add_model(body: Model):
@@ -354,8 +412,11 @@ async def api_add_model(body: Model):
         return wrong_api()
     if body.name is None:
         return return_error(400, "Model name is required")
-    result = add_model(body.name, body.description, body.price_in, body.price_out)
-    return check_result(result, 400, "Cant add model")
+    try:
+        result = add_model(body.name, body.description, body.price_in, body.price_out)
+        return check_result(result, 400, "Cant add model")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/models/delete")
@@ -364,8 +425,11 @@ async def api_delete_model(body: Model):
         return wrong_api()
     if body.model_id is None:
         return return_error(400, "Model conv_id is required")
-    result = delete_model(body.model_id)
-    return check_result(result, 400, "Cant delete model")
+    try:
+        result = delete_model(body.model_id)
+        return check_result(result, 400, "Cant delete model")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 # ASSISTANTS ENDPOINTS
@@ -373,11 +437,14 @@ async def api_delete_model(body: Model):
 async def api_get_assistant(body: Assistant):
     if check_api_key(body.api_key) is False:
         return wrong_api()
-    if body.assist_id is not None:
-        result = get_assistant_by_id(body.assist_id)
-    else:
-        result = get_all_assistants()
-    return check_result(result, 400, "No assistants")
+    try:
+        if body.assist_id is not None:
+            result = get_assistant_by_id(body.assist_id)
+        else:
+            result = get_all_assistants()
+        return check_result(result, 400, "No assistants")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/assistant/update")
@@ -388,9 +455,11 @@ async def api_update_assistant(body: Assistant):
         return return_error(400, "Assistant conv_id is required")
     if body.name is None:
         return return_error(400, "Assistant name is required")
-
-    result = update_assistant(body.assist_id, body.name, body.description, body.welcome, body.prompt, body.user)
-    return check_result(result, 400, "Cant update assistant")
+    try:
+        result = update_assistant(body.assist_id, body.name, body.description, body.welcome, body.prompt, body.user)
+        return check_result(result, 400, "Cant update assistant")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/assistant/update_field")
@@ -403,8 +472,11 @@ async def api_update_assistant_field(body: Assistant):
         return return_error(400, "Assistant field is required")
     if body.value is None:
         return return_error(400, "Assistant value is required")
-    result = update_assistant_field(body.assist_id, body.field, body.value)
-    return check_result(result, 400, "Cant update assistant")
+    try:
+        result = update_assistant_field(body.assist_id, body.field, body.value)
+        return check_result(result, 400, "Cant update assistant")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/assistant/add")
@@ -413,8 +485,11 @@ async def api_add_assistant(body: Assistant):
         return wrong_api()
     if body.name is None:
         return return_error(400, "Assistant name is required")
-    result = add_assistant(body.name, body.description, body.welcome, body.prompt, body.user)
-    return check_result(result, 400, "Cant add assistant")
+    try:
+        result = add_assistant(body.name, body.description, body.welcome, body.prompt, body.user)
+        return check_result(result, 400, "Cant add assistant")
+    except Exception as e:
+        return return_error(400, str(e))
 
 
 @app.post("/assistant/delete")
@@ -423,5 +498,8 @@ async def api_delete_assistant(body: Assistant):
         return wrong_api()
     if body.assist_id is None:
         return return_error(400, "Assistant conv_id is required")
-    result = delete_assistant(body.assist_id)
-    return check_result(result, 400, "Cant delete assistant")
+    try:
+        result = delete_assistant(body.assist_id)
+        return check_result(result, 400, "Cant delete assistant")
+    except Exception as e:
+        return return_error(400, str(e))

@@ -1,53 +1,31 @@
 import os
-import time
+import psycopg2
 from contextlib import contextmanager
-
-import pandas as pd
-import psycopg2 as psycopg2
 from dotenv import load_dotenv
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
+import logging
 
+logging.basicConfig(filename='database.log', level=logging.ERROR)
 load_dotenv()
 database_url = os.getenv("CR_DATABASE_URL")
-conn = None
 
-
-def connect_to_db():
-    """
-    Connect to the database
-    :return:
-    """
-    global conn
-
-    if conn is None or conn.closed == 1:
-        try:
-            conn = psycopg2.connect(database_url)
-        except Exception as e:
-            raise Exception("Failed to connect to the database: " + str(e))
-
-    return conn
+# Create a connection pool
+db_pool = psycopg2.pool.SimpleConnectionPool(1, 20, database_url)
 
 
 @contextmanager
 def get_db_cursor():
-    """
-    Get a cursor to the database
-
-    :return:
-    """
-    connection = connect_to_db()
-    if connection is None:
-        raise Exception("No connection to the database")
-    else:
-        try:
-            with connection.cursor(cursor_factory=RealDictCursor) as cursor:
-                yield cursor
-            connection.commit()
-        except Exception as err:
-            connection.rollback()
-            raise Exception("Failed to get cursor: " + str(err))
-        finally:
-            connection.close()
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            yield cursor
+        conn.commit()
+    except Exception as err:
+        conn.rollback()
+        logging.error("Failed to get cursor: ", exc_info=True)
+    finally:
+        db_pool.putconn(conn)
 
 
 def fetch_all(cursor, query, params=None):
@@ -94,24 +72,23 @@ def fetch_one(cursor, query, params):
         return None
 
 
-def save_error(error, metadata=None, cursor=None):
+def save_error(error, metadata=None):
     """
     Save an error to the database
-    :param cursor:
     :param error:
     :param metadata:
     :return:
     """
+    error_message = str(error)
+    print(error_message)
+    logging.error("An error occurred: ", exc_info=True)
+    with get_db_cursor() as cursor:
+        try:
+            cursor.execute(
+                "INSERT INTO errors (error_text, metadata) VALUES (%s, %s)",
+                (error_message, metadata)
+            )
+        except Exception as e:
+            logging.error("Failed to save error to database: ", exc_info=True)
 
-    print(str(error))
-
-    # if cursor is None:
-    #     with get_db_cursor() as cursor:
-    #         if cursor:
-    #             return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
-    #                              (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
-    # else:
-    #     if cursor:
-    #         return fetch_one(cursor, "INSERT INTO errors (error_text, metadata, date) VALUES (%s, %s, %s)",
-    #                          (str(error), metadata, pd.Timestamp(time.time(), unit='s')))
     return -1
